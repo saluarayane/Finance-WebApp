@@ -80,14 +80,13 @@ export default function Dashboard() {
   };
 
   // 🚀 LÓGICA 1 e 2: Salva a partir da calculadora, com o mês escolhido e check obrigatoriamente FALSE
-  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
-    // 📍 O Sheety remove o último "s" de GANHOS_E_COMISSOES para criar o objeto de envio
+const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+    // Mantenha aqui a palavra exata que você confirmou no Sheety
     const payload = {
-      ganhosEComissoe: { 
-        idGanho: `GN-${Date.now()}`,
+      ganhosEComissoes: { 
         descricao: "Comissão de Venda Projetada",
-        valorImovel: sale.propertyValue, // Envia para a coluna nova
-        valor: sale.commission, // 📍 CORREÇÃO: Envia a comissão para a coluna VALOR
+        valorImovel: sale.propertyValue,
+        valor: sale.commission,
         mesReferencia: sale.month,
         recebido: false
       }
@@ -98,11 +97,25 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-    .then(res => res.json())
-    .then(() => {
-      carregarVendasDoBanco(); // 📍 LÓGICA 3: Força a atualização do card na hora
+    .then(async res => {
+      const data = await res.json();
+      
+      // Se o Sheety bloquear, ele vai avisar o motivo exato aqui!
+      if (!res.ok) {
+        alert("🚨 ERRO DO SHEETY: " + JSON.stringify(data));
+        throw new Error("Sheety bloqueou o envio");
+      }
+      
+      return data;
     })
-    .catch(err => console.error("Erro crítico ao salvar comissão no Sheets:", err));
+    .then(() => {
+      // Se passar, ele vai dar sucesso e atualizar a tela!
+      alert("✅ SALVOU COM SUCESSO NA PLANILHA!");
+      carregarVendasDoBanco();
+    })
+    .catch(err => {
+      console.error("Erro interno:", err);
+    });
   };
 
   // 🔘 LÓGICA 4: Altera o status do check na planilha e atualiza o saldo na hora
