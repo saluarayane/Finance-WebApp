@@ -1,7 +1,6 @@
-import React, { useState } from "react";
-import { motion } from "motion/react";
+import React from "react";
 import { GlassCard } from "./GlassCard";
-import { Target, CheckCircle2, Circle, TrendingUp } from "lucide-react";
+import { Check, Calendar } from "lucide-react";
 import { clsx } from "clsx";
 
 export interface ProjectedSale {
@@ -18,113 +17,56 @@ interface AnnualGoalsProps {
 }
 
 export function AnnualGoals({ projectedSales, onToggleReceived }: AnnualGoalsProps) {
-  const totalProjected = projectedSales.reduce((sum, sale) => sum + sale.commission, 0);
-  const totalReceived = projectedSales
-    .filter(sale => sale.received)
-    .reduce((sum, sale) => sum + sale.commission, 0);
-  const percentReceived = totalProjected > 0 ? (totalReceived / totalProjected) * 100 : 0;
-
-  // Group sales by month
-  const salesByMonth = projectedSales.reduce((acc, sale) => {
-    if (!acc[sale.month]) {
-      acc[sale.month] = [];
-    }
-    acc[sale.month].push(sale);
-    return acc;
-  }, {} as Record<string, ProjectedSale[]>);
-
   return (
     <GlassCard className="p-5">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <Target size={18} className="text-cyan-400" />
-          <h2 className="text-lg font-bold text-white">Metas Anuais</h2>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-white/50">Projetado</p>
-          <p className="text-sm font-bold text-cyan-400">
-            R$ {totalProjected.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+        Metas Anuais e Projeções
+        <Calendar size={16} className="text-fuchsia-400" />
+      </h2>
+
+      {projectedSales.length === 0 ? (
+        <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-white/5">
+          <p className="text-xs text-white/40 font-medium">
+            Nenhuma comissão projetada. Use a calculadora abaixo para planejar!
           </p>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+          {projectedSales.map((sale) => (
+            <div
+              key={sale.id}
+              className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3.5 backdrop-blur-sm"
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-fuchsia-400">
+                  Venda em {sale.month === "Mai" ? "Maio" : sale.month}
+                </span>
+                <span className="text-xs text-white/50">
+                  Imóvel: {sale.propertyValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </div>
 
-      {/* Progress Summary */}
-      <div className="mb-5 p-4 rounded-xl bg-white/5 border border-white/10">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-white/60">Recebido</span>
-          <span className="text-lg font-bold text-green-400">
-            R$ {totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border-[0.5px] border-white/10">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${percentReceived}%` }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="h-full rounded-full bg-gradient-to-r from-green-500 to-cyan-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]"
-          />
-        </div>
-      </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-fuchsia-400">
+                  +{sale.commission.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
 
-      {/* Sales by Month */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-white/70 flex items-center gap-2">
-          <TrendingUp size={14} />
-          Vendas Projetadas
-        </h3>
-
-        {Object.entries(salesByMonth).length === 0 ? (
-          <div className="py-6 text-center">
-            <p className="text-sm text-white/40">Nenhuma venda projetada</p>
-            <p className="text-xs text-white/30 mt-1">Use a calculadora para adicionar projeções</p>
-          </div>
-        ) : (
-          Object.entries(salesByMonth).map(([month, sales]) => (
-            <div key={month} className="space-y-2">
-              <p className="text-xs font-medium text-white/50 uppercase tracking-wide">{month}</p>
-              {sales.map((sale) => (
-                <motion.div
-                  key={sale.id}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={clsx(
-                    "flex items-center justify-between p-3 rounded-xl border transition-all group cursor-pointer",
-                    sale.received
-                      ? "bg-green-500/10 border-green-500/30"
-                      : "bg-white/5 border-white/10 hover:border-white/20"
-                  )}
+                <button
                   onClick={() => onToggleReceived(sale.id)}
+                  className={clsx(
+                    "w-7 h-7 rounded-lg border flex items-center justify-center transition-all",
+                    sale.received
+                      ? "bg-green-500 border-green-400 text-white shadow-[0_0_10px_rgba(74,222,128,0.5)]"
+                      : "border-white/20 bg-white/5 text-transparent hover:border-white/40"
+                  )}
                 >
-                  <div className="flex items-center gap-3">
-                    {sale.received ? (
-                      <CheckCircle2 size={20} className="text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.6)]" />
-                    ) : (
-                      <Circle size={20} className="text-white/30 group-hover:text-white/50 transition-colors" />
-                    )}
-                    <div>
-                      <p className={clsx(
-                        "text-sm font-medium",
-                        sale.received ? "text-green-300" : "text-white"
-                      )}>
-                        Comissão de R$ {sale.propertyValue.toLocaleString('pt-BR')}
-                      </p>
-                      <p className="text-xs text-white/40">
-                        {sale.received ? "Recebido" : "Aguardando"}
-                      </p>
-                    </div>
-                  </div>
-                  <span className={clsx(
-                    "text-sm font-bold",
-                    sale.received ? "text-green-400" : "text-cyan-400"
-                  )}>
-                    R$ {sale.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </motion.div>
-              ))}
+                  <Check size={14} strokeWidth={3} className={clsx(!sale.received && "opacity-0")} />
+                </button>
+              </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </GlassCard>
   );
 }
