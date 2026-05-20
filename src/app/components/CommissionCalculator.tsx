@@ -21,7 +21,6 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
 
   const numericValue = parseFloat(propertyValue.replace(/\D/g, '')) / 100 || 0;
   
-  // Imobiliária usually takes 5-6%, corretor takes a cut of that (e.g. 35% of the 5%)
   const commissionPercentage = 0.05; // 5% total commission
   const agentCut = 0.35; // 35% for the agent
   
@@ -42,34 +41,22 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
     }
   };
 
-<<<<<<< HEAD
-const handleSave = () => {
-=======
- const handleSave = () => {
->>>>>>> b8d8777af8cd328bd3d45d50934c4e9b367e4267
+  const handleSave = () => {
     if (agentCommission <= 0) return;
 
     // 1. Coloca o botão no modo de carregamento animado ("Projetando...")
     setSyncState("syncing");
 
     // 2. Dispara a gravação REAL na API do Sheety lá no Dashboard
-    // Removemos o setTimeout externo para a gravação começar imediatamente!
-    onAddProjectedSale({
-      propertyValue: numericValue,
-      commission: agentCommission,
-      month: selectedMonth,
-      received: false
-    });
+    if (onAddProjectedSale) {
+      onAddProjectedSale({
+        propertyValue: numericValue,
+        commission: agentCommission,
+        month: selectedMonth,
+        received: false
+      });
+    }
 
-<<<<<<< HEAD
-    setSyncState("success");
-    
-    setTimeout(() => {
-      setSyncState("idle");
-      setOpen(false);
-      setPropertyValue("");
-    }, 1000); 
-=======
     // 3. Ativa o aviso de sucesso e agenda o fechamento suave do painel
     setSyncState("success");
     
@@ -77,9 +64,7 @@ const handleSave = () => {
       setSyncState("idle");
       setOpen(false);
       setPropertyValue("");
-      // Deixamos o seletor do mês congelado no mês que o usuário acabou de usar
     }, 1200); 
->>>>>>> b8d8777af8cd328bd3d45d50934c4e9b367e4267
   };
 
   return (
@@ -192,8 +177,6 @@ const handleSave = () => {
                   className="relative w-full h-14 rounded-2xl font-bold text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-transform active:scale-95 group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-fuchsia-600 opacity-90 group-hover:opacity-100 transition-opacity" />
-                  
-                  {/* Glass reflection */}
                   <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
                   
                   <div className="relative h-full flex items-center justify-center gap-2 z-10">
@@ -204,7 +187,6 @@ const handleSave = () => {
                       </>
                     ) : syncState === "syncing" ? (
                       <div className="flex items-center gap-2">
-                        {/* Shimmer effect inside button */}
                         <motion.div
                           animate={{ x: ["-100%", "200%"] }}
                           transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
