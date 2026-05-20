@@ -50,11 +50,7 @@ export function MonthDetailView({ month, onUpdateBalance }: MonthDetailViewProps
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Ganhos Recebidos (Comissões)
-  const [incomes, setIncomes] = useState<Income[]>([
-    { id: "1", description: "Comissão Apt. Centro", amount: 12450.00, date: "05/05" },
-    { id: "2", description: "Comissão Casa Jardim", amount: 8320.50, date: "18/05" },
-    { id: "3", description: "Consultoria Imobiliária", amount: 2500.00, date: "25/05" },
-  ]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
 
   // Ganhos Fixos Quinzenais
   const [fixedIncomes] = useState<FixedIncome[]>([
@@ -67,8 +63,6 @@ export function MonthDetailView({ month, onUpdateBalance }: MonthDetailViewProps
     { id: "e1", description: "Cigarro", amount: 345.00, date: "01/05", type: 'fixed' },
     { id: "e2", description: "Maconha", amount: 360.00, date: "01/05", type: 'fixed' },
     { id: "e3", description: "Academia", amount: 110.00, date: "01/05", type: 'fixed' },
-    { id: "e4", description: "Alimentação", amount: 450.00, date: "10/05", type: 'variable' },
-    { id: "e5", description: "Lazer", amount: 280.00, date: "12/05", type: 'variable' },
   ]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
