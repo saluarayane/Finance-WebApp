@@ -21,7 +21,7 @@ export default function Dashboard() {
   const balance = totalIncome - totalExpenses;
 
   // 📍 MANTENHA A SUA URL DO APPS SCRIPT AQUI
-  const URL_NATIVA_GOOGLE = "COLE_AQUI_A_SUA_URL_DO_APPS_SCRIPT";
+  const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
   const carregarVendasDoBanco = () => {
     // 📍 CORREÇÃO 1: Pedindo a aba com o nome MAIÚSCULO exato
