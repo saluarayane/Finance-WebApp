@@ -78,9 +78,9 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
-  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const payload = {
-      aba: "GANHOS_E_COMISSOES", // 📍 CORREÇÃO 2: Nome exato para salvar
+      aba: "GANHOS_E_COMISSOES", 
       action: "INSERT",
       data: {
         descricao: "Comissão de Venda Projetada",
@@ -93,15 +93,33 @@ export default function Dashboard() {
 
     fetch(URL_NATIVA_GOOGLE, {
       method: "POST",
-      // 📍 CORREÇÃO 3: Proteção obrigatória para o Google não bloquear o salvamento (CORS)
       headers: { "Content-Type": "text/plain;charset=utf-8" }, 
       body: JSON.stringify(payload)
     })
-    .then(res => res.json())
+    .then(async res => {
+      // Pega a resposta pura do Google antes de tentar ler como JSON
+      const text = await res.text();
+      
+      try {
+        const data = JSON.parse(text);
+        if (data.error) {
+          alert("🚨 O GOOGLE REJEITOU: " + data.error);
+          throw new Error(data.error);
+        }
+        return data;
+      } catch (e) {
+        alert("🚨 ERRO BIZARRO DE CONEXÃO. O Google respondeu isso: \n" + text.substring(0, 150));
+        throw new Error("Falha no parse do Google");
+      }
+    })
     .then(() => {
+      alert("✅ DEU CERTO! O Google salvou e o Card vai atualizar agora.");
       carregarVendasDoBanco(); 
     })
-    .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
+    .catch(err => {
+      alert("🛑 ERRO CRÍTICO (Provável CORS ou Link quebrado): " + err.message);
+      console.error(err);
+    });
   };
 
   const handleToggleReceived = (id: string) => {
