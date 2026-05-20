@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { motion } from "motion/react";
 import { GlassCard } from "./GlassCard";
 import { Target, CheckCircle2, Circle, TrendingUp } from "lucide-react";
@@ -18,14 +18,17 @@ interface AnnualGoalsProps {
 }
 
 export function AnnualGoals({ projectedSales, onToggleReceived }: AnnualGoalsProps) {
-  const totalProjected = projectedSales.reduce((sum, sale) => sum + sale.commission, 0);
-  const totalReceived = projectedSales
+  // 📍 CORREÇÃO: Filtra para garantir que só apareçam comissões reais maiores que zero (remove os fantasias)
+  const vendasReais = projectedSales.filter(sale => sale.commission > 0);
+
+  const totalProjected = vendasReais.reduce((sum, sale) => sum + sale.commission, 0);
+  const totalReceived = vendasReais
     .filter(sale => sale.received)
     .reduce((sum, sale) => sum + sale.commission, 0);
   const percentReceived = totalProjected > 0 ? (totalReceived / totalProjected) * 100 : 0;
 
-  // Group sales by month
-  const salesByMonth = projectedSales.reduce((acc, sale) => {
+  // Group sales by month (Usando apenas as vendas válidas)
+  const salesByMonth = vendasReais.reduce((acc, sale) => {
     if (!acc[sale.month]) {
       acc[sale.month] = [];
     }
@@ -48,7 +51,7 @@ export function AnnualGoals({ projectedSales, onToggleReceived }: AnnualGoalsPro
         </div>
       </div>
 
-      {/* Progress Summary */}
+      {/* Progress Summary - Intacto */}
       <div className="mb-5 p-4 rounded-xl bg-white/5 border border-white/10">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-white/60">Recebido</span>
@@ -74,9 +77,9 @@ export function AnnualGoals({ projectedSales, onToggleReceived }: AnnualGoalsPro
         </h3>
 
         {Object.entries(salesByMonth).length === 0 ? (
-          <div className="py-6 text-center">
-            <p className="text-sm text-white/40">Nenhuma venda projetada</p>
-            <p className="text-xs text-white/30 mt-1">Use a calculadora para adicionar projeções</p>
+          <div className="py-8 text-center border border-dashed border-white/10 rounded-xl bg-white/5 backdrop-blur-sm">
+            <p className="text-xs text-white/40 font-medium">Nenhuma venda projetada</p>
+            <p className="text-[10px] text-white/20 mt-1">Use a calculadora para adicionar projeções</p>
           </div>
         ) : (
           Object.entries(salesByMonth).map(([month, sales]) => (
@@ -106,10 +109,10 @@ export function AnnualGoals({ projectedSales, onToggleReceived }: AnnualGoalsPro
                         "text-sm font-medium",
                         sale.received ? "text-green-300" : "text-white"
                       )}>
-                        Comissão de R$ {sale.propertyValue.toLocaleString('pt-BR')}
+                        Venda de Imóvel: R$ {sale.propertyValue.toLocaleString('pt-BR')}
                       </p>
                       <p className="text-xs text-white/40">
-                        {sale.received ? "Recebido" : "Aguardando"}
+                        {sale.received ? "Recebido" : "Aguardando comissão"}
                       </p>
                     </div>
                   </div>
