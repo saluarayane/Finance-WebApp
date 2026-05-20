@@ -146,7 +146,7 @@ export default function Dashboard() {
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
 
         <div className="w-full space-y-6 mt-2">
-          <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} />
+          <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} projectedSales={projectedSales} />
           
           <ExpenseAnalysis
             onUpdateBalance={handleUpdateBalance}

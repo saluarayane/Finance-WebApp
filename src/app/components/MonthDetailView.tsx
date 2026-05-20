@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GlassCard } from "./GlassCard";
-import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp, Edit2, Trash2, Calendar } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { clsx } from "clsx";
 
-interface Income {
+// 📍 1. Adicionamos a interface para ele entender o que é uma venda projetada
+interface ProjectedSale {
   id: string;
-  description: string;
-  amount: number;
-  date: string;
+  propertyValue: number;
+  commission: number;
+  month: string;
+  received: boolean;
 }
 
 interface FixedIncome {
@@ -29,94 +31,43 @@ interface Expense {
 interface MonthDetailViewProps {
   month: string;
   onUpdateBalance?: (amount: number) => void;
+  projectedSales?: ProjectedSale[]; // 📍 2. Adicionamos a propriedade para receber do Dashboard
 }
 
 const monthNames: { [key: string]: string } = {
-  "Jan": "Janeiro",
-  "Fev": "Fevereiro",
-  "Mar": "Março",
-  "Abr": "Abril",
-  "Mai": "Maio",
-  "Jun": "Junho",
-  "Jul": "Julho",
-  "Ago": "Agosto",
-  "Set": "Setembro",
-  "Out": "Outubro",
-  "Nov": "Novembro",
-  "Dez": "Dezembro"
+  "Jan": "Janeiro", "Fev": "Fevereiro", "Mar": "Março", "Abr": "Abril",
+  "Mai": "Maio", "Jun": "Junho", "Jul": "Julho", "Ago": "Agosto",
+  "Set": "Setembro", "Out": "Outubro", "Nov": "Novembro", "Dez": "Dezembro"
 };
 
-export function MonthDetailView({ month, onUpdateBalance }: MonthDetailViewProps) {
+export function MonthDetailView({ month, onUpdateBalance, projectedSales = [] }: MonthDetailViewProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const fullMonthName = monthNames[month] || month;
 
-  // Ganhos Recebidos (Comissões)
-  const [incomes, setIncomes] = useState<Income[]>([]);
+  // 📍 3. O SEGREDO: Filtra dinamicamente as comissões daquele mês que estão com CHECK
+  const incomes = projectedSales
+    .filter(sale => (sale.month === month || sale.month === fullMonthName) && sale.received)
+    .map(sale => ({
+      id: sale.id,
+      description: "Comissão de Venda",
+      amount: sale.commission,
+      date: "Meta Concluída"
+    }));
 
-  // Ganhos Fixos Quinzenais
   const [fixedIncomes] = useState<FixedIncome[]>([
     { id: "f1", description: "Quinzena 1", amount: 650.00, date: "01/05" },
     { id: "f2", description: "Quinzena 2", amount: 650.00, date: "15/05" },
   ]);
 
-  // Gastos (Fixos e Variáveis)
   const [expenses] = useState<Expense[]>([
     { id: "e1", description: "Cigarro", amount: 345.00, date: "01/05", type: 'fixed' },
     { id: "e2", description: "Maconha", amount: 360.00, date: "01/05", type: 'fixed' },
     { id: "e3", description: "Academia", amount: 110.00, date: "01/05", type: 'fixed' },
   ]);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState({ description: "", amount: "" });
-
   const totalCommissions = incomes.reduce((sum, income) => sum + income.amount, 0);
   const totalFixedIncome = fixedIncomes.reduce((sum, income) => sum + income.amount, 0);
   const totalIncome = totalCommissions + totalFixedIncome;
-
-  const handleDelete = (id: string) => {
-    const income = incomes.find(i => i.id === id);
-    if (income && onUpdateBalance) {
-      onUpdateBalance(-income.amount);
-    }
-    setIncomes(incomes.filter(i => i.id !== id));
-  };
-
-  const handleEditStart = (income: Income) => {
-    setEditingId(income.id);
-    setEditValue({
-      description: income.description,
-      amount: income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-    });
-  };
-
-  const handleEditSave = (id: string) => {
-    const amount = parseFloat(editValue.amount.replace(/\D/g, '')) / 100 || 0;
-    const oldIncome = incomes.find(i => i.id === id);
-
-    if (oldIncome && onUpdateBalance) {
-      const difference = amount - oldIncome.amount;
-      onUpdateBalance(difference);
-    }
-
-    setIncomes(incomes.map(i =>
-      i.id === id
-        ? { ...i, description: editValue.description, amount }
-        : i
-    ));
-    setEditingId(null);
-  };
-
-  const handleFormatCurrency = (value: string) => {
-    value = value.replace(/\D/g, "");
-    if (value) {
-      return (parseInt(value) / 100).toLocaleString("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-    return "";
-  };
-
-  const fullMonthName = monthNames[month] || month;
 
   return (
     <motion.div
@@ -162,82 +113,28 @@ export function MonthDetailView({ month, onUpdateBalance }: MonthDetailViewProps
                   <ArrowUpRight size={14} />
                   Ganhos Recebidos
                 </h4>
+                {incomes.length === 0 && (
+                  <p className="text-xs text-white/30 italic px-2">Nenhuma comissão recebida neste mês.</p>
+                )}
                 {incomes.map((income) => (
                   <div
                     key={income.id}
-                    className={clsx(
-                      "p-3 rounded-xl border transition-all group",
-                      editingId === income.id
-                        ? "bg-cyan-500/10 border-cyan-500/30"
-                        : "bg-cyan-500/5 border-cyan-500/10 hover:border-cyan-500/30"
-                    )}
+                    className="p-3 rounded-xl border bg-cyan-500/5 border-cyan-500/10 transition-all"
                   >
-                    {editingId === income.id ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={editValue.description}
-                          onChange={(e) => setEditValue({ ...editValue, description: e.target.value })}
-                          className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white outline-none focus:border-cyan-500/50 transition-all"
-                          autoFocus
-                        />
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-sm">R$</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={editValue.amount}
-                            onChange={(e) => setEditValue({ ...editValue, amount: handleFormatCurrency(e.target.value) })}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-cyan-500/50 transition-all"
-                          />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]">
+                          <ArrowUpRight size={16} />
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditSave(income.id)}
-                            className="flex-1 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-cyan-400 text-white text-sm font-medium transition-all active:scale-95"
-                          >
-                            Salvar
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="py-1.5 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm font-medium transition-all active:scale-95"
-                          >
-                            Cancelar
-                          </button>
+                        <div>
+                          <p className="text-sm font-medium text-white">{income.description}</p>
+                          <p className="text-xs text-white/40">{income.date}</p>
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]">
-                            <ArrowUpRight size={16} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-white">{income.description}</p>
-                            <p className="text-xs text-white/40">{income.date}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
-                            R$ {income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button
-                              onClick={() => handleEditStart(income)}
-                              className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 transition-all"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(income.id)}
-                              className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition-all"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                      <span className="text-sm font-bold text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
+                        R$ {income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -249,10 +146,7 @@ export function MonthDetailView({ month, onUpdateBalance }: MonthDetailViewProps
                   Ganhos Fixos
                 </h4>
                 {fixedIncomes.map((income) => (
-                  <div
-                    key={income.id}
-                    className="p-3 rounded-xl border bg-cyan-500/5 border-cyan-500/10"
-                  >
+                  <div key={income.id} className="p-3 rounded-xl border bg-cyan-500/5 border-cyan-500/10">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]">
