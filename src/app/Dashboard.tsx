@@ -17,21 +17,20 @@ export default function Dashboard() {
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
 
   const fixedIncome = 1300; 
-  // 📍 LÓGICA 4: O totalIncome agora junta dinamicamente o Fixo + as Comissões do mês que estão com CHECK
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
   const URL_DASHBOARD = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/dashboardMensal";
   const URL_GANHOS    = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/ganhosEComissoes";
 
-  // 🔄 Função isolada para recarregar as vendas sempre em sincronia com o banco
+  // 🔄 Carrega as vendas em perfeita sincronia usando o ID numérico nativo do Sheety
   const carregarVendasDoBanco = () => {
     fetch(URL_GANHOS)
       .then(res => res.json())
       .then(data => {
         if (data.ganhosEComissoes) {
           const formatado: ProjectedSale[] = data.ganhosEComissoes.map((item: any) => ({
-            id: String(item.idGanhos || item.id),
+            id: String(item.id), // 📍 CRÍTICO: Usando o ID sequencial numérico nativo para o PUT não falhar
             propertyValue: Number(item.valorImovel || 0),
             commission: Number(item.valorComissao || 0),
             month: item.mesReferencia || "Jun",
@@ -43,7 +42,6 @@ export default function Dashboard() {
       .catch(err => console.error("Erro ao buscar Ganhos:", err));
   };
 
-  // 🔄 Monitora e calcula as comissões REAIS recebidas do mês selecionado
   useEffect(() => {
     fetch(URL_DASHBOARD)
       .then(res => res.json())
@@ -58,7 +56,6 @@ export default function Dashboard() {
     carregarVendasDoBanco();
   }, [selectedMonth]); 
 
-  // Recalcula o somatório do cabeçalho local toda vez que o array de vendas mudar
   useEffect(() => {
     const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
     const comissoesDoMesComCheck = projectedSales
@@ -80,16 +77,16 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
-  // 🚀 LÓGICA 1 e 2: Salva a partir da calculadora, com o mês escolhido e check obrigatoriamente FALSE
-const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
-    // 📍 AJUSTE DE OURO: O nome do objeto precisa bater exatamente com o singular/plural mapeado pelo Sheety
+  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+    // 📍 NOTA: Se no seu painel do Sheety o objeto esperado no POST se chamar "ganhosEComissao" (no singular),
+    // mude a palavra abaixo de "ganhosEComissoes" para "ganhosEComissao".
     const payload = {
       ganhosEComissoes: { 
         descricao: "Comissão de Venda Projetada",
         valorImovel: sale.propertyValue,
         valorComissao: sale.commission,
         mesReferencia: sale.month,
-        recebido: false // Inicia estritamente desmarcado
+        recebido: false
       }
     };
 
@@ -105,29 +102,32 @@ const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
       return res.json();
     })
     .then(() => {
-      // Força o aplicativo a ler o banco de novo e atualizar o card na hora!
-      carregarVendasDoBanco();
+      carregarVendasDoBanco(); // Recarrega o array com o novo ID gerado pelo Sheets
     })
-    .catch(err => console.error("Erro crítico ao salvar comissão no Sheets:", err));
+    .catch(err => console.error("Erro ao salvar comissão:", err));
   };
 
-  // 🔘 LÓGICA 4: Altera o status do check na planilha e atualiza o saldo na hora
   const handleToggleReceived = (id: string) => {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
 
     const novoStatus = !vendaAlvo.received;
 
+    // 📍 NOTA: Aplique aqui o mesmo nome de objeto (singular ou plural) descoberto no painel do Sheety
+    const payload = {
+      ganhosEComissoes: {
+        recebido: novoStatus
+      }
+    };
+
     fetch(`${URL_GANHOS}/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ganhosEComissao: {
-          recebido: novoStatus
-        }
-      })
+      body: JSON.stringify(payload)
     })
-    .then(() => {
+    .then(res => {
+      if (!res.ok) throw new Error("Erro ao atualizar check no Sheets");
+      
       setProjectedSales(prev => prev.map(sale => {
         if (sale.id === id) {
           return { ...sale, received: novoStatus };
@@ -135,7 +135,7 @@ const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
         return sale;
       }));
     })
-    .catch(err => console.error("Erro ao atualizar status:", err));
+    .catch(err => console.error(err));
   };
 
   return (
@@ -143,16 +143,11 @@ const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
       <BackgroundOrbs />
 
       <div className="max-w-md mx-auto w-full px-6 pt-10 flex flex-col items-center">
-
         <Header balance={balance} />
 
-        <MonthSelector
-          selectedMonth={selectedMonth}
-          onSelect={setSelectedMonth}
-        />
+        <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
 
         <div className="w-full space-y-6 mt-2">
-
           <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} />
 
           <ExpenseAnalysis
@@ -162,21 +157,14 @@ const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
             selectedMonth={selectedMonth}
           />
 
-          {/* Passando o selectedMonth dinâmico para os gastos extras controlarem o filtro */}
           <ExtraExpensesProjection selectedMonth={selectedMonth} />
 
-          {/* 📍 LÓGICA 3: O card de metas recebe as vendas brutas do ano todo e ignora a barra de rolagem */}
-          <AnnualGoals
-            projectedSales={projectedSales}
-            onToggleReceived={handleToggleReceived}
-          />
+          <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
 
           <SavingsModule />
-
         </div>
       </div>
 
-      {/* Mantido o seu componente original intacto para o visual do botão flutuante não mudar */}
       <CommissionCalculator
         onAddCommission={handleAddCommission}
         onAddProjectedSale={handleAddProjectedSale}
