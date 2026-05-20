@@ -42,28 +42,30 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
     }
   };
 
-  const handleSave = () => {
+ const handleSave = () => {
     if (agentCommission <= 0) return;
 
+    // 1. Coloca o botão no modo de carregamento animado ("Projetando...")
     setSyncState("syncing");
 
-    // Add projected sale
-    setTimeout(() => {
-      setSyncState("success");
-      onAddProjectedSale({
-        propertyValue: numericValue,
-        commission: agentCommission,
-        month: selectedMonth,
-        received: false
-      });
+    // 2. Dispara a gravação REAL na API do Sheety lá no Dashboard
+    // Removemos o setTimeout externo para a gravação começar imediatamente!
+    onAddProjectedSale({
+      propertyValue: numericValue,
+      commission: agentCommission,
+      month: selectedMonth,
+      received: false
+    });
 
-      setTimeout(() => {
-        setSyncState("idle");
-        setOpen(false);
-        setPropertyValue("");
-        setSelectedMonth("Mai");
-      }, 1500);
-    }, 1500);
+    // 3. Ativa o aviso de sucesso e agenda o fechamento suave do painel
+    setSyncState("success");
+    
+    setTimeout(() => {
+      setSyncState("idle");
+      setOpen(false);
+      setPropertyValue("");
+      // Deixamos o seletor do mês congelado no mês que o usuário acabou de usar
+    }, 1200); 
   };
 
   return (
