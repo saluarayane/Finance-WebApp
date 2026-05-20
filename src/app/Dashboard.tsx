@@ -17,22 +17,23 @@ export default function Dashboard() {
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
 
   const fixedIncome = 1300; 
+  // 📍 LÓGICA 4: O totalIncome agora junta dinamicamente o Fixo + as Comissões do mês que estão com CHECK
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
   const URL_DASHBOARD = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/dashboardMensal";
   const URL_GANHOS    = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/ganhosEComissoes";
 
-  // 🔄 Carrega as vendas em perfeita sincronia usando o ID numérico nativo do Sheety
+  // 🔄 Função isolada para recarregar as vendas sempre em sincronia com o banco
   const carregarVendasDoBanco = () => {
     fetch(URL_GANHOS)
       .then(res => res.json())
       .then(data => {
         if (data.ganhosEComissoes) {
           const formatado: ProjectedSale[] = data.ganhosEComissoes.map((item: any) => ({
-            id: String(item.id), // 📍 CRÍTICO: Usando o ID sequencial numérico nativo para o PUT não falhar
-            propertyValue: Number(item.valorImovel || 0),
-            commission: Number(item.valorComissao || 0),
+            id: String(item.id), 
+            propertyValue: Number(item.valorImovel || 0), // Agora vai ler da coluna nova
+            commission: Number(item.valor || 0), // 📍 CORREÇÃO: Lê o ganho da coluna VALOR
             month: item.mesReferencia || "Jun",
             received: item.recebido === "TRUE" || item.recebido === true || String(item.recebido).toLowerCase() === "true"
           }));
@@ -56,6 +57,7 @@ export default function Dashboard() {
     carregarVendasDoBanco();
   }, [selectedMonth]); 
 
+  // Recalcula o somatório do cabeçalho local toda vez que o array de vendas mudar
   useEffect(() => {
     const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
     const comissoesDoMesComCheck = projectedSales
@@ -77,14 +79,15 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
+  // 🚀 LÓGICA 1 e 2: Salva a partir da calculadora, com o mês escolhido e check obrigatoriamente FALSE
   const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
-    // 📍 NOTA: Se no seu painel do Sheety o objeto esperado no POST se chamar "ganhosEComissao" (no singular),
-    // mude a palavra abaixo de "ganhosEComissoes" para "ganhosEComissao".
+    // 📍 O Sheety remove o último "s" de GANHOS_E_COMISSOES para criar o objeto de envio
     const payload = {
-      ganhosEComissoes: { 
+      ganhosEComissoe: { 
+        idGanho: `GN-${Date.now()}`,
         descricao: "Comissão de Venda Projetada",
-        valorImovel: sale.propertyValue,
-        valorComissao: sale.commission,
+        valorImovel: sale.propertyValue, // Envia para a coluna nova
+        valor: sale.commission, // 📍 CORREÇÃO: Envia a comissão para a coluna VALOR
         mesReferencia: sale.month,
         recebido: false
       }
@@ -95,27 +98,22 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-    .then(res => {
-      if (!res.ok) {
-        throw new Error(`Erro na API do Sheety: ${res.statusText}`);
-      }
-      return res.json();
-    })
+    .then(res => res.json())
     .then(() => {
-      carregarVendasDoBanco(); // Recarrega o array com o novo ID gerado pelo Sheets
+      carregarVendasDoBanco(); // 📍 LÓGICA 3: Força a atualização do card na hora
     })
-    .catch(err => console.error("Erro ao salvar comissão:", err));
+    .catch(err => console.error("Erro crítico ao salvar comissão no Sheets:", err));
   };
 
+  // 🔘 LÓGICA 4: Altera o status do check na planilha e atualiza o saldo na hora
   const handleToggleReceived = (id: string) => {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
 
     const novoStatus = !vendaAlvo.received;
 
-    // 📍 NOTA: Aplique aqui o mesmo nome de objeto (singular ou plural) descoberto no painel do Sheety
     const payload = {
-      ganhosEComissoes: {
+      ganhosEComissoe: {
         recebido: novoStatus
       }
     };
@@ -125,9 +123,7 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-    .then(res => {
-      if (!res.ok) throw new Error("Erro ao atualizar check no Sheets");
-      
+    .then(() => {
       setProjectedSales(prev => prev.map(sale => {
         if (sale.id === id) {
           return { ...sale, received: novoStatus };
@@ -135,7 +131,7 @@ export default function Dashboard() {
         return sale;
       }));
     })
-    .catch(err => console.error(err));
+    .catch(err => console.error("Erro ao atualizar status:", err));
   };
 
   return (
@@ -144,12 +140,11 @@ export default function Dashboard() {
 
       <div className="max-w-md mx-auto w-full px-6 pt-10 flex flex-col items-center">
         <Header balance={balance} />
-
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
 
         <div className="w-full space-y-6 mt-2">
           <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} />
-
+          
           <ExpenseAnalysis
             onUpdateBalance={handleUpdateBalance}
             onUpdateExpenses={handleUpdateExpenses}
