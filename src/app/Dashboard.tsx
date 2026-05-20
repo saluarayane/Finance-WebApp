@@ -28,14 +28,15 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => {
         if (data.GANHOS_E_COMISSOES) {
-          const formatado: ProjectedSale[] = data.GANHOS_E_COMISSOES.map((item: any) => ({
-            id: String(item.id), 
-            // 📍 Correção de leitura: busca tanto valorImovel quanto outras variações
-            propertyValue: Number(item.valorImovel || item.valor_imovel || 0), 
-            // 📍 Correção Crítica: agora lê a coluna valorComissao perfeitamente
-            commission: Number(item.valorComissao || item.valor_comissao || item.valor || 0), 
-            month: item.mesReferencia || "Jun",
-            received: item.recebido === "TRUE" || item.recebido === true || String(item.recebido).toLowerCase() === "true"
+          // 📍 O SEGREDO 1: Lemos com os nomes EXATOS da planilha e filtramos as Quinzenas!
+          const apenasComissoes = data.GANHOS_E_COMISSOES.filter((item: any) => Number(item.VALOR_IMOVEL) > 0);
+
+          const formatado: ProjectedSale[] = apenasComissoes.map((item: any) => ({
+            id: String(item.ID_GANHO), 
+            propertyValue: Number(item.VALOR_IMOVEL), 
+            commission: Number(item.VALOR), 
+            month: item.MES_REFERENCIA,
+            received: item.RECEBIDO === "TRUE" || item.RECEBIDO === true || String(item.RECEBIDO).toLowerCase() === "true"
           }));
           setProjectedSales(formatado);
         }
@@ -79,15 +80,17 @@ export default function Dashboard() {
   };
 
   const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+    // 📍 O SEGREDO 2: O payload de envio tem os nomes idênticos às colunas!
     const payload = {
       aba: "GANHOS_E_COMISSOES", 
       action: "INSERT",
       data: {
-        descricao: "Comissão de Venda Projetada",
-        valorImovel: sale.propertyValue, 
-        valorComissao: sale.commission, // 📍 Correção Crítica: Enviando exatamente como está na sua planilha
-        mesReferencia: sale.month,
-        recebido: false
+        ID_GANHO: `GN-${Date.now()}`,
+        DESCRICAO: "Comissão de Venda Projetada",
+        VALOR: sale.commission, 
+        MES_REFERENCIA: sale.month,
+        RECEBIDO: false,
+        VALOR_IMOVEL: sale.propertyValue
       }
     };
 
@@ -98,7 +101,7 @@ export default function Dashboard() {
     })
     .then(res => res.json())
     .then(() => {
-      carregarVendasDoBanco(); // Recarrega os dados e preenche o card na mesma hora
+      carregarVendasDoBanco(); 
     })
     .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
   };
@@ -112,9 +115,9 @@ export default function Dashboard() {
     const payload = {
       aba: "GANHOS_E_COMISSOES",
       action: "UPDATE",
-      id: id,
+      id: id, // O ID procurado será o nosso "GN-1234"
       data: {
-        recebido: novoStatus
+        RECEBIDO: novoStatus
       }
     };
 
