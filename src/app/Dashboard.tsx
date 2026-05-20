@@ -81,14 +81,14 @@ export default function Dashboard() {
   };
 
   // 🚀 LÓGICA 1 e 2: Salva a partir da calculadora, com o mês escolhido e check obrigatoriamente FALSE
-  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+    // 📍 AJUSTE DE OURO: O nome do objeto precisa bater exatamente com o singular/plural mapeado pelo Sheety
     const payload = {
-      ganhosEComissao: {
-        idGanhos: `GN-${Date.now()}`,
+      ganhosEComissoes: { 
         descricao: "Comissão de Venda Projetada",
         valorImovel: sale.propertyValue,
         valorComissao: sale.commission,
-        mesReferencia: sale.month, // Puxa o mês que você clicou dentro da calculadora
+        mesReferencia: sale.month,
         recebido: false // Inicia estritamente desmarcado
       }
     };
@@ -98,12 +98,17 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`Erro na API do Sheety: ${res.statusText}`);
+      }
+      return res.json();
+    })
     .then(() => {
-      // Recarrega os dados para atualizar o card de Metas Anuais na hora
+      // Força o aplicativo a ler o banco de novo e atualizar o card na hora!
       carregarVendasDoBanco();
     })
-    .catch(err => console.error("Erro ao salvar comissão:", err));
+    .catch(err => console.error("Erro crítico ao salvar comissão no Sheets:", err));
   };
 
   // 🔘 LÓGICA 4: Altera o status do check na planilha e atualiza o saldo na hora

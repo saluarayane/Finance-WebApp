@@ -42,7 +42,11 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
     }
   };
 
+<<<<<<< HEAD
+const handleSave = () => {
+=======
  const handleSave = () => {
+>>>>>>> b8d8777af8cd328bd3d45d50934c4e9b367e4267
     if (agentCommission <= 0) return;
 
     // 1. Coloca o botão no modo de carregamento animado ("Projetando...")
@@ -57,6 +61,15 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
       received: false
     });
 
+<<<<<<< HEAD
+    setSyncState("success");
+    
+    setTimeout(() => {
+      setSyncState("idle");
+      setOpen(false);
+      setPropertyValue("");
+    }, 1000); 
+=======
     // 3. Ativa o aviso de sucesso e agenda o fechamento suave do painel
     setSyncState("success");
     
@@ -66,6 +79,7 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
       setPropertyValue("");
       // Deixamos o seletor do mês congelado no mês que o usuário acabou de usar
     }, 1200); 
+>>>>>>> b8d8777af8cd328bd3d45d50934c4e9b367e4267
   };
 
   return (
