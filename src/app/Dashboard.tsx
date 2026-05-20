@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"; // 📍 CORREÇÃO: Importado o useEffect que faltava
+import { useState, useEffect } from "react";
 import { BackgroundOrbs } from "./components/BackgroundOrbs";
 import { Header } from "./components/Header";
 import { MonthSelector } from "./components/MonthSelector";
@@ -17,24 +17,15 @@ export default function Dashboard() {
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
 
   const fixedIncome = 1300; 
+  // 📍 LÓGICA 4: O totalIncome agora junta dinamicamente o Fixo + as Comissões do mês que estão com CHECK
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
   const URL_DASHBOARD = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/dashboardMensal";
   const URL_GANHOS    = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/ganhosEComissoes";
 
-  useEffect(() => {
-    fetch(URL_DASHBOARD)
-      .then(res => res.json())
-      .then(data => {
-        if (data.dashboardMensal && data.dashboardMensal.length > 0) {
-          const dadosMes = data.dashboardMensal[0]; 
-          setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
-          setCommissionsReceived(Number(dadosMes.comissoesRecebidas || 0));
-        }
-      })
-      .catch(err => console.error("Erro ao buscar Dashboard:", err));
-
+  // 🔄 Função isolada para recarregar as vendas sempre em sincronia com o banco
+  const carregarVendasDoBanco = () => {
     fetch(URL_GANHOS)
       .then(res => res.json())
       .then(data => {
@@ -44,13 +35,38 @@ export default function Dashboard() {
             propertyValue: Number(item.valorImovel || 0),
             commission: Number(item.valorComissao || 0),
             month: item.mesReferencia || "Jun",
-            received: item.recebido === "TRUE" || item.recebido === true
+            received: item.recebido === "TRUE" || item.recebido === true || String(item.recebido).toLowerCase() === "true"
           }));
           setProjectedSales(formatado);
         }
       })
       .catch(err => console.error("Erro ao buscar Ganhos:", err));
+  };
+
+  // 🔄 Monitora e calcula as comissões REAIS recebidas do mês selecionado
+  useEffect(() => {
+    fetch(URL_DASHBOARD)
+      .then(res => res.json())
+      .then(data => {
+        if (data.dashboardMensal && data.dashboardMensal.length > 0) {
+          const dadosMes = data.dashboardMensal[0]; 
+          setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
+        }
+      })
+      .catch(err => console.error("Erro ao buscar Dashboard:", err));
+
+    carregarVendasDoBanco();
   }, [selectedMonth]); 
+
+  // Recalcula o somatório do cabeçalho local toda vez que o array de vendas mudar
+  useEffect(() => {
+    const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
+    const comissoesDoMesComCheck = projectedSales
+      .filter(sale => (sale.month === filtroMesExtenso || sale.month === selectedMonth) && sale.received)
+      .reduce((sum, sale) => sum + sale.commission, 0);
+
+    setCommissionsReceived(comissoesDoMesComCheck);
+  }, [projectedSales, selectedMonth]);
 
   const handleUpdateBalance = (amount: number) => {
     setCommissionsReceived(prev => prev + amount);
@@ -64,6 +80,7 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
+  // 🚀 LÓGICA 1 e 2: Salva a partir da calculadora, com o mês escolhido e check obrigatoriamente FALSE
   const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const payload = {
       ganhosEComissao: {
@@ -71,8 +88,8 @@ export default function Dashboard() {
         descricao: "Comissão de Venda Projetada",
         valorImovel: sale.propertyValue,
         valorComissao: sale.commission,
-        mesReferencia: sale.month,
-        recebido: false
+        mesReferencia: sale.month, // Puxa o mês que você clicou dentro da calculadora
+        recebido: false // Inicia estritamente desmarcado
       }
     };
 
@@ -82,16 +99,14 @@ export default function Dashboard() {
       body: JSON.stringify(payload)
     })
     .then(res => res.json())
-    .then(data => {
-      const novaVenda: ProjectedSale = {
-        ...sale,
-        id: data.ganhosEComissao.idGanhos
-      };
-      setProjectedSales(prev => [...prev, novaVenda]);
+    .then(() => {
+      // Recarrega os dados para atualizar o card de Metas Anuais na hora
+      carregarVendasDoBanco();
     })
     .catch(err => console.error("Erro ao salvar comissão:", err));
   };
 
+  // 🔘 LÓGICA 4: Altera o status do check na planilha e atualiza o saldo na hora
   const handleToggleReceived = (id: string) => {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
@@ -110,11 +125,6 @@ export default function Dashboard() {
     .then(() => {
       setProjectedSales(prev => prev.map(sale => {
         if (sale.id === id) {
-          if (novoStatus) {
-            handleAddCommission(sale.commission);
-          } else {
-            handleAddCommission(-sale.commission);
-          }
           return { ...sale, received: novoStatus };
         }
         return sale;
@@ -140,7 +150,6 @@ export default function Dashboard() {
 
           <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} />
 
-          {/* 📍 CORREÇÃO: Passando o selectedMonth dinâmico para as rotas internas de gastos */}
           <ExpenseAnalysis
             onUpdateBalance={handleUpdateBalance}
             onUpdateExpenses={handleUpdateExpenses}
@@ -148,8 +157,10 @@ export default function Dashboard() {
             selectedMonth={selectedMonth}
           />
 
-          <ExtraExpensesProjection />
+          {/* Passando o selectedMonth dinâmico para os gastos extras controlarem o filtro */}
+          <ExtraExpensesProjection selectedMonth={selectedMonth} />
 
+          {/* 📍 LÓGICA 3: O card de metas recebe as vendas brutas do ano todo e ignora a barra de rolagem */}
           <AnnualGoals
             projectedSales={projectedSales}
             onToggleReceived={handleToggleReceived}
@@ -160,6 +171,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Mantido o seu componente original intacto para o visual do botão flutuante não mudar */}
       <CommissionCalculator
         onAddCommission={handleAddCommission}
         onAddProjectedSale={handleAddProjectedSale}
