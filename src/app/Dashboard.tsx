@@ -9,12 +9,21 @@ import { ExtraExpensesProjection } from "./components/ExtraExpensesProjection";
 import { AnnualGoals, type ProjectedSale } from "./components/AnnualGoals";
 import { CommissionCalculator } from "./components/CommissionCalculator";
 
+export interface ExtraExpense {
+  id: string;
+  description: string;
+  amount: number;
+  targetMonth: string; // O mês em que o gasto vai ocorrer
+  creationMonth: string; // O mês em que o usuário está visualizando/programando
+}
+
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState("Mai");
 
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [commissionsReceived, setCommissionsReceived] = useState(0);
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
+  const [extraExpenses, setExtraExpenses] = useState<ExtraExpense[]>([]);
 
   const fixedIncome = 1300; 
   const totalIncome = fixedIncome + commissionsReceived;
@@ -44,19 +53,36 @@ export default function Dashboard() {
       .catch(err => console.error("Erro ao buscar Ganhos no Google Script:", err));
   };
 
-  useEffect(() => {
-    fetch(`${URL_NATIVA_GOOGLE}?aba=DASHBOARD_MENSAL`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.DASHBOARD_MENSAL && data.DASHBOARD_MENSAL.length > 0) {
-          const dadosMes = data.DASHBOARD_MENSAL[0]; 
-          setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
-        }
-      })
-      .catch(err => console.error("Erro ao buscar Dashboard:", err));
+  const carregarGastosExtrasDoBanco = () => {
+  fetch(`${URL_NATIVA_GOOGLE}?aba=GASTOS_EXTRAS`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.GASTOS_EXTRAS) {
+        const formatado: ExtraExpense[] = data.GASTOS_EXTRAS.map((item: any) => ({
+          id: String(item.ID),
+          description: item.DESCRICAO,
+          amount: Number(item.VALOR || 0),
+          targetMonth: item.MES_ALVO,      // Ex: "Jun"
+          creationMonth: item.MES_CRIACAO  // Ex: "Mai"
+        }));
+        setExtraExpenses(formatado);
+      }
+    });
+};
 
-    carregarVendasDoBanco();
-  }, [selectedMonth]); 
+  useEffect(() => {
+  fetch(`${URL_NATIVA_GOOGLE}?aba=DASHBOARD_MENSAL`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.DASHBOARD_MENSAL && data.DASHBOARD_MENSAL.length > 0) {
+        const dadosMes = data.DASHBOARD_MENSAL[0]; 
+        setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
+      }
+    });
+
+  carregarVendasDoBanco();
+  carregarGastosExtrasDoBanco(); // 📍 Adicione esta chamada aqui!
+}, [selectedMonth]);
 
   useEffect(() => {
     const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
@@ -146,7 +172,7 @@ export default function Dashboard() {
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
 
         <div className="w-full space-y-6 mt-2">
-          <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} projectedSales={projectedSales} />
+          <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} projectedSales={projectedSales} extraExpenses={extraExpenses} />
           
           <ExpenseAnalysis
             onUpdateBalance={handleUpdateBalance}
