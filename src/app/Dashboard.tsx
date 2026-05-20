@@ -20,20 +20,20 @@ export default function Dashboard() {
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
-  // 📍 MANTENHA A SUA URL DO APPS SCRIPT AQUI
+  // 📍 COLE AQUI A SUA URL DO APPS SCRIPT
   const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
   const carregarVendasDoBanco = () => {
-    // 📍 CORREÇÃO 1: Pedindo a aba com o nome MAIÚSCULO exato
     fetch(`${URL_NATIVA_GOOGLE}?aba=GANHOS_E_COMISSOES`)
       .then(res => res.json())
       .then(data => {
-        // 📍 O Google devolve o objeto com a chave idêntica ao nome da aba
         if (data.GANHOS_E_COMISSOES) {
           const formatado: ProjectedSale[] = data.GANHOS_E_COMISSOES.map((item: any) => ({
             id: String(item.id), 
+            // 📍 Correção de leitura: busca tanto valorImovel quanto outras variações
             propertyValue: Number(item.valorImovel || item.valor_imovel || 0), 
-            commission: Number(item.valor || 0), 
+            // 📍 Correção Crítica: agora lê a coluna valorComissao perfeitamente
+            commission: Number(item.valorComissao || item.valor_comissao || item.valor || 0), 
             month: item.mesReferencia || "Jun",
             received: item.recebido === "TRUE" || item.recebido === true || String(item.recebido).toLowerCase() === "true"
           }));
@@ -78,14 +78,14 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
-const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
+  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const payload = {
       aba: "GANHOS_E_COMISSOES", 
       action: "INSERT",
       data: {
         descricao: "Comissão de Venda Projetada",
         valorImovel: sale.propertyValue, 
-        valor: sale.commission, 
+        valorComissao: sale.commission, // 📍 Correção Crítica: Enviando exatamente como está na sua planilha
         mesReferencia: sale.month,
         recebido: false
       }
@@ -96,30 +96,11 @@ const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
       headers: { "Content-Type": "text/plain;charset=utf-8" }, 
       body: JSON.stringify(payload)
     })
-    .then(async res => {
-      // Pega a resposta pura do Google antes de tentar ler como JSON
-      const text = await res.text();
-      
-      try {
-        const data = JSON.parse(text);
-        if (data.error) {
-          alert("🚨 O GOOGLE REJEITOU: " + data.error);
-          throw new Error(data.error);
-        }
-        return data;
-      } catch (e) {
-        alert("🚨 ERRO BIZARRO DE CONEXÃO. O Google respondeu isso: \n" + text.substring(0, 150));
-        throw new Error("Falha no parse do Google");
-      }
-    })
+    .then(res => res.json())
     .then(() => {
-      alert("✅ DEU CERTO! O Google salvou e o Card vai atualizar agora.");
-      carregarVendasDoBanco(); 
+      carregarVendasDoBanco(); // Recarrega os dados e preenche o card na mesma hora
     })
-    .catch(err => {
-      alert("🛑 ERRO CRÍTICO (Provável CORS ou Link quebrado): " + err.message);
-      console.error(err);
-    });
+    .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
   };
 
   const handleToggleReceived = (id: string) => {
