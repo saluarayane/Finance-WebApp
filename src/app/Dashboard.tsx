@@ -20,17 +20,19 @@ export default function Dashboard() {
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
-  const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
+  // 📍 MANTENHA A SUA URL DO APPS SCRIPT AQUI
+  const URL_NATIVA_GOOGLE = "COLE_AQUI_A_SUA_URL_DO_APPS_SCRIPT";
 
-  // 🔄 BUSCA AS VENDAS DA API DO GOOGLE
   const carregarVendasDoBanco = () => {
-    fetch(`${URL_NATIVA_GOOGLE}?aba=ganhosEComissoes`)
+    // 📍 CORREÇÃO 1: Pedindo a aba com o nome MAIÚSCULO exato
+    fetch(`${URL_NATIVA_GOOGLE}?aba=GANHOS_E_COMISSOES`)
       .then(res => res.json())
       .then(data => {
-        if (data.ganhosEComissoes) {
-          const formatado: ProjectedSale[] = data.ganhosEComissoes.map((item: any) => ({
+        // 📍 O Google devolve o objeto com a chave idêntica ao nome da aba
+        if (data.GANHOS_E_COMISSOES) {
+          const formatado: ProjectedSale[] = data.GANHOS_E_COMISSOES.map((item: any) => ({
             id: String(item.id), 
-            propertyValue: Number(item.valorImovel || 0), 
+            propertyValue: Number(item.valorImovel || item.valor_imovel || 0), 
             commission: Number(item.valor || 0), 
             month: item.mesReferencia || "Jun",
             received: item.recebido === "TRUE" || item.recebido === true || String(item.recebido).toLowerCase() === "true"
@@ -42,12 +44,11 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // Busca os dados da dashboard mensal usando o parâmetro da aba
-    fetch(`${URL_NATIVA_GOOGLE}?aba=dashboardMensal`)
+    fetch(`${URL_NATIVA_GOOGLE}?aba=DASHBOARD_MENSAL`)
       .then(res => res.json())
       .then(data => {
-        if (data.dashboardMensal && data.dashboardMensal.length > 0) {
-          const dadosMes = data.dashboardMensal[0]; 
+        if (data.DASHBOARD_MENSAL && data.DASHBOARD_MENSAL.length > 0) {
+          const dadosMes = data.DASHBOARD_MENSAL[0]; 
           setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
         }
       })
@@ -56,7 +57,6 @@ export default function Dashboard() {
     carregarVendasDoBanco();
   }, [selectedMonth]); 
 
-  // Recalcula o somatório do cabeçalho local toda vez que o array de vendas mudar
   useEffect(() => {
     const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
     const comissoesDoMesComCheck = projectedSales
@@ -78,10 +78,9 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
-  // 🚀 LÓGICA 1 e 2: Salva via POST informando a ação INSERT para a API nativa
   const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const payload = {
-      aba: "ganhosEComissoes",
+      aba: "GANHOS_E_COMISSOES", // 📍 CORREÇÃO 2: Nome exato para salvar
       action: "INSERT",
       data: {
         descricao: "Comissão de Venda Projetada",
@@ -94,16 +93,17 @@ export default function Dashboard() {
 
     fetch(URL_NATIVA_GOOGLE, {
       method: "POST",
+      // 📍 CORREÇÃO 3: Proteção obrigatória para o Google não bloquear o salvamento (CORS)
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, 
       body: JSON.stringify(payload)
     })
     .then(res => res.json())
     .then(() => {
-      carregarVendasDoBanco(); // 📍 LÓGICA 3: Força o card a se preencher sozinho na hora
+      carregarVendasDoBanco(); 
     })
     .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
   };
 
-  // 🔘 LÓGICA 4: Faz o check enviando um POST com a ação UPDATE para a API nativa
   const handleToggleReceived = (id: string) => {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
@@ -111,7 +111,7 @@ export default function Dashboard() {
     const novoStatus = !vendaAlvo.received;
 
     const payload = {
-      aba: "ganhosEComissoes",
+      aba: "GANHOS_E_COMISSOES",
       action: "UPDATE",
       id: id,
       data: {
@@ -121,6 +121,7 @@ export default function Dashboard() {
 
     fetch(URL_NATIVA_GOOGLE, {
       method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     })
     .then(() => {
