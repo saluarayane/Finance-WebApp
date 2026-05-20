@@ -17,34 +17,33 @@ export default function Dashboard() {
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
 
   const fixedIncome = 1300; 
-  // 📍 LÓGICA 4: O totalIncome agora junta dinamicamente o Fixo + as Comissões do mês que estão com CHECK
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
-  const URL_DASHBOARD = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/dashboardMensal";
-  const URL_GANHOS    = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/ganhosEComissoes";
+  const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
-  // 🔄 Função isolada para recarregar as vendas sempre em sincronia com o banco
+  // 🔄 BUSCA AS VENDAS DA API DO GOOGLE
   const carregarVendasDoBanco = () => {
-    fetch(URL_GANHOS)
+    fetch(`${URL_NATIVA_GOOGLE}?aba=ganhosEComissoes`)
       .then(res => res.json())
       .then(data => {
         if (data.ganhosEComissoes) {
           const formatado: ProjectedSale[] = data.ganhosEComissoes.map((item: any) => ({
             id: String(item.id), 
-            propertyValue: Number(item.valorImovel || 0), // Agora vai ler da coluna nova
-            commission: Number(item.valor || 0), // 📍 CORREÇÃO: Lê o ganho da coluna VALOR
+            propertyValue: Number(item.valorImovel || 0), 
+            commission: Number(item.valor || 0), 
             month: item.mesReferencia || "Jun",
             received: item.recebido === "TRUE" || item.recebido === true || String(item.recebido).toLowerCase() === "true"
           }));
           setProjectedSales(formatado);
         }
       })
-      .catch(err => console.error("Erro ao buscar Ganhos:", err));
+      .catch(err => console.error("Erro ao buscar Ganhos no Google Script:", err));
   };
 
   useEffect(() => {
-    fetch(URL_DASHBOARD)
+    // Busca os dados da dashboard mensal usando o parâmetro da aba
+    fetch(`${URL_NATIVA_GOOGLE}?aba=dashboardMensal`)
       .then(res => res.json())
       .then(data => {
         if (data.dashboardMensal && data.dashboardMensal.length > 0) {
@@ -79,46 +78,32 @@ export default function Dashboard() {
     setCommissionsReceived(prev => prev + amount);
   };
 
-  // 🚀 LÓGICA 1 e 2: Salva a partir da calculadora, com o mês escolhido e check obrigatoriamente FALSE
-const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
-    // Mantenha aqui a palavra exata que você confirmou no Sheety
+  // 🚀 LÓGICA 1 e 2: Salva via POST informando a ação INSERT para a API nativa
+  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const payload = {
-      ganhosEComissoes: { 
+      aba: "ganhosEComissoes",
+      action: "INSERT",
+      data: {
         descricao: "Comissão de Venda Projetada",
-        valorImovel: sale.propertyValue,
-        valor: sale.commission,
+        valorImovel: sale.propertyValue, 
+        valor: sale.commission, 
         mesReferencia: sale.month,
         recebido: false
       }
     };
 
-    fetch(URL_GANHOS, {
+    fetch(URL_NATIVA_GOOGLE, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-    .then(async res => {
-      const data = await res.json();
-      
-      // Se o Sheety bloquear, ele vai avisar o motivo exato aqui!
-      if (!res.ok) {
-        alert("🚨 ERRO DO SHEETY: " + JSON.stringify(data));
-        throw new Error("Sheety bloqueou o envio");
-      }
-      
-      return data;
-    })
+    .then(res => res.json())
     .then(() => {
-      // Se passar, ele vai dar sucesso e atualizar a tela!
-      alert("✅ SALVOU COM SUCESSO NA PLANILHA!");
-      carregarVendasDoBanco();
+      carregarVendasDoBanco(); // 📍 LÓGICA 3: Força o card a se preencher sozinho na hora
     })
-    .catch(err => {
-      console.error("Erro interno:", err);
-    });
+    .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
   };
 
-  // 🔘 LÓGICA 4: Altera o status do check na planilha e atualiza o saldo na hora
+  // 🔘 LÓGICA 4: Faz o check enviando um POST com a ação UPDATE para a API nativa
   const handleToggleReceived = (id: string) => {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
@@ -126,14 +111,16 @@ const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const novoStatus = !vendaAlvo.received;
 
     const payload = {
-      ganhosEComissoe: {
+      aba: "ganhosEComissoes",
+      action: "UPDATE",
+      id: id,
+      data: {
         recebido: novoStatus
       }
     };
 
-    fetch(`${URL_GANHOS}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+    fetch(URL_NATIVA_GOOGLE, {
+      method: "POST",
       body: JSON.stringify(payload)
     })
     .then(() => {

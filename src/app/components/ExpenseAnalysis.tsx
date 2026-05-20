@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; // 📍 CORREÇÃO: Adicionado useEffect
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Cigarette, Leaf, Dumbbell, Coffee, ShoppingBag, Zap, Plus, Edit3, X, Trash2, Check, MoreHorizontal } from "lucide-react";
 import { GlassCard } from "./GlassCard";
@@ -39,11 +39,10 @@ interface ExpenseAnalysisProps {
   onUpdateBalance?: (amount: number) => void;
   onUpdateExpenses?: (totalExpenses: number) => void;
   totalIncome?: number;
-  selectedMonth?: string; // 📍 CORREÇÃO: Recebendo o mês ativo do topo
+  selectedMonth?: string;
 }
 
-const URL_MOVIMENTACAO = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/movimentacaoVariavel";
-const URL_FIXOS = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/gastosFixos"; // 📍 CORREÇÃO: Adicionado link dos fixos
+const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
 export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome = 23270.50, selectedMonth = "Mai" }: ExpenseAnalysisProps) {
   const [quickExpense, setQuickExpense] = useState("");
@@ -57,17 +56,16 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
   const [addingFixed, setAddingFixed] = useState(false);
   const [newFixed, setNewFixed] = useState({ name: "", amount: "", iconIndex: 0 });
 
-  // 🔄 📍 CORREÇÃO: Buscar gastos fixos e variáveis reais salvos no Sheets ao iniciar
   useEffect(() => {
-    // Buscar Gastos Fixos
-    fetch(URL_FIXOS)
+    // 🔄 Buscar Gastos Fixos via API Google
+    fetch(`${URL_NATIVA_GOOGLE}?aba=gastosFixos`)
       .then(res => res.json())
       .then(data => {
         if (data.gastosFixos) {
           const carregados = data.gastosFixos.map((item: any) => {
             const iconObj = iconOptions.find(o => o.name.toLowerCase() === String(item.iconeRef || "").toLowerCase()) || iconOptions[0];
             return {
-              id: item.idFixo || item.id,
+              id: String(item.id),
               name: item.categoria,
               amount: Number(item.valor || 0),
               icon: iconObj.icon,
@@ -78,19 +76,18 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
         }
       });
 
-    // Buscar Gastos Variáveis do mês selecionado
-    fetch(URL_MOVIMENTACAO)
+    // 🔄 Buscar Gastos Variáveis via API Google
+    fetch(`${URL_NATIVA_GOOGLE}?aba=movimentacaoVariavel`)
       .then(res => res.json())
       .then(data => {
         if (data.movimentacaoVariavel) {
-          // Converte o nome do mês curto (ex: "Mai") para o extenso (ex: "Maio") se necessário, ou bate direto
           const filtroMes = selectedMonth === "Mai" ? "Maio" : selectedMonth;
           const filtrados = data.movimentacaoVariavel
             .filter((item: any) => item.mesReferencia === filtroMes)
             .map((item: any) => {
               const catId = variableCategories.find(c => c.name === item.categoria)?.id || "outros";
               return {
-                id: String(item.idMov || item.id),
+                id: String(item.id),
                 amount: Number(item.valor || 0),
                 category: catId,
                 timestamp: new Date()
@@ -133,40 +130,36 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
 
     if (value > 0) {
       const payload = {
-        movimentacaoVariavel: {
-          idMov: `MV-${Date.now()}`,
+        aba: "movimentacaoVariavel",
+        action: "INSERT",
+        data: {
           data: new Date().toLocaleDateString('pt-BR'),
           categoria: nomeCategoriaExibicao,
           valor: value,
-          mesReferencia: selectedMonth === "Mai" ? "Maio" : selectedMonth // 📍 CORREÇÃO: Mês Dinâmico
+          mesReferencia: selectedMonth === "Mai" ? "Maio" : selectedMonth
         }
       };
 
-      fetch(URL_MOVIMENTACAO, {
+      fetch(URL_NATIVA_GOOGLE, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
       .then(res => res.json())
       .then(data => {
         const newExpense: VariableExpense = {
-          id: String(data.movimentacaoVariavel.id), // Sheety usa o ID sequencial para DELETE/PUT
+          id: String(data.id), // Pega o ID gerado pelo GAS
           amount: value,
           category: categoryId,
           timestamp: new Date()
         };
 
         setTodayExpenses(prev => [...prev, newExpense]);
-
-        if (onUpdateBalance) {
-          onUpdateBalance(-value);
-        }
-
+        if (onUpdateBalance) onUpdateBalance(-value);
         setQuickExpense("");
         setSelectedCategory(null);
         setShowCategorySelector(false);
       })
-      .catch(err => console.error("Erro ao computar gasto variável:", err));
+      .catch(err => console.error("Erro ao salvar gasto variável:", err));
     }
   };
 
@@ -174,21 +167,21 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
     const expense = todayExpenses.find(exp => exp.id === id);
     if (!expense) return;
 
-    fetch(`${URL_MOVIMENTACAO}/${id}`, {
-      method: "DELETE"
+    fetch(URL_NATIVA_GOOGLE, {
+      method: "POST",
+      body: JSON.stringify({ aba: "movimentacaoVariavel", action: "DELETE", id: id })
     })
     .then(() => {
-      if (onUpdateBalance) {
-        onUpdateBalance(expense.amount);
-      }
+      if (onUpdateBalance) onUpdateBalance(expense.amount);
       setTodayExpenses(prev => prev.filter(exp => exp.id !== id));
     })
-    .catch(err => console.error("Erro ao deletar gasto:", err));
+    .catch(err => console.error("Erro ao deletar:", err));
   };
 
   const handleDeleteFixed = (id: number | string) => {
-    fetch(`${URL_FIXOS}/${id}`, {
-      method: "DELETE"
+    fetch(URL_NATIVA_GOOGLE, {
+      method: "POST",
+      body: JSON.stringify({ aba: "gastosFixos", action: "DELETE", id: String(id) })
     })
     .then(() => {
       setFixedExpenses(prev => prev.filter(exp => exp.id !== id));
@@ -202,23 +195,23 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
       const selectedIcon = iconOptions[newFixed.iconIndex];
       
       const payload = {
-        gastosFixo: {
-          idFixo: `FX-${Date.now()}`,
+        aba: "gastosFixos",
+        action: "INSERT",
+        data: {
           categoria: newFixed.name,
           valor: amount,
           iconeRef: selectedIcon.name.toLowerCase()
         }
       };
 
-      fetch(URL_FIXOS, {
+      fetch(URL_NATIVA_GOOGLE, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
       .then(res => res.json())
       .then(data => {
         const newExpense: FixedExpense = {
-          id: data.gastosFixo.id,
+          id: String(data.id),
           name: newFixed.name,
           amount,
           icon: selectedIcon.icon,
@@ -244,7 +237,7 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
 
   return (
     <div className="space-y-6 w-full">
-      {/* O resto do código visual (JSX) permanece idêntico ao seu original */}
+      {/* 📍 A PARTIR DAQUI O VISUAL CONTINUA 100% IDÊNTICO */}
       <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -417,7 +410,38 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, totalIncome
             );
           })}
         </div>
-        {/* ... manter bloco do formulário do fixed expenses idêntico ... */}
+
+        {editingFixed && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="overflow-hidden">
+            {!addingFixed ? (
+              <button onClick={() => setAddingFixed(true)} className="w-full py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-2">
+                <Plus size={16} /> <span className="text-sm">Adicionar Categoria Fixa</span>
+              </button>
+            ) : (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-3">
+                <input type="text" value={newFixed.name} onChange={(e) => setNewFixed({ ...newFixed, name: e.target.value })} placeholder="Nome da categoria" className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white outline-none focus:border-fuchsia-500/50 transition-all placeholder:text-white/30" />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-sm">R$</span>
+                  <input type="text" inputMode="numeric" value={newFixed.amount} onChange={(e) => setNewFixed({ ...newFixed, amount: handleFormatCurrency(e.target.value) })} placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-fuchsia-500/50" />
+                </div>
+                <div className="grid grid-cols-6 gap-2">
+                  {iconOptions.map((option, index) => {
+                    const Icon = option.icon;
+                    return (
+                      <button key={index} onClick={() => setNewFixed({ ...newFixed, iconIndex: index })} className={clsx("w-10 h-10 rounded-lg flex items-center justify-center transition-all", newFixed.iconIndex === index ? "bg-fuchsia-500/30 border-fuchsia-400/50 border" : "bg-white/5 border border-white/10", option.color)}>
+                        <Icon size={16} />
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleAddFixed} className="flex-1 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-fuchsia-600 text-white text-sm font-medium transition-all active:scale-95">Adicionar</button>
+                  <button onClick={() => { setAddingFixed(false); setNewFixed({ name: "", amount: "", iconIndex: 0 }); }} className="py-2 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm">Cancelar</button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
       </GlassCard>
     </div>
   );

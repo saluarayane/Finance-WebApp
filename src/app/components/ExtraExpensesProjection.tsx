@@ -11,32 +11,29 @@ interface ExtraExpense {
   month: string;
 }
 
-// Interface para receber o mês selecionado no topo do aplicativo
 interface ExtraExpensesProjectionProps {
   selectedMonth?: string;
 }
 
 const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-// 📍 URL da sua nova aba configurada e ativa no Sheety
-const URL_GASTOS_EXTRAS = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/gastosExtras";
+const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
 export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpensesProjectionProps) {
   const [expenses, setExpenses] = useState<ExtraExpense[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newExpense, setNewExpense] = useState({ name: "", amount: "", month: "Mai" });
 
-  // Converte o mês resumido do topo para o extenso correspondente da planilha se necessário
   const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
 
-  // 🔄 1. BUSCAR GASTOS EXTRAS DA PLANILHA
+  // 🔄 Buscar via API do Google
   useEffect(() => {
-    fetch(URL_GASTOS_EXTRAS)
+    fetch(`${URL_NATIVA_GOOGLE}?aba=gastosExtras`)
       .then((res) => res.json())
       .then((data) => {
         if (data.gastosExtras) {
           const carregados = data.gastosExtras.map((item: any) => ({
-            id: String(item.id), // Sheety ID sequencial para manipulação de rotas
+            id: String(item.id),
             name: item.descricao,
             amount: Number(item.valor || 0),
             month: item.mesReferencia,
@@ -45,32 +42,32 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
         }
       })
       .catch((err) => console.error("Erro ao buscar Gastos Extras:", err));
-  }, [selectedMonth]); // Recarrega se mudar o mês ou salvar algo novo
+  }, [selectedMonth]); 
 
-  // 🚀 2. SALVAR NOVO GASTO EXTRA NO GOOGLE SHEETS
+  // 🚀 Salvar via API do Google (INSERT)
   const handleAddExpense = () => {
     const amount = parseFloat(newExpense.amount.replace(/\D/g, "")) / 100 || 0;
     const mesParaSalvar = newExpense.month === "Mai" ? "Maio" : newExpense.month;
 
     if (newExpense.name && amount > 0) {
       const payload = {
-        gastosExtra: {
-          idExtra: `EX-${Date.now()}`,
+        aba: "gastosExtras",
+        action: "INSERT",
+        data: {
           descricao: newExpense.name,
           valor: amount,
-          mesReferencia: mesParaSalvar, // Salva o mês escolhido no seletor do card
+          mesReferencia: mesParaSalvar,
         },
       };
 
-      fetch(URL_GASTOS_EXTRAS, {
+      fetch(URL_NATIVA_GOOGLE, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
         .then((res) => res.json())
         .then((data) => {
           const novoGasto: ExtraExpense = {
-            id: String(data.gastosExtra.id),
+            id: String(data.id), // ID gerado nativamente pelo GAS
             name: newExpense.name,
             amount,
             month: mesParaSalvar,
@@ -84,10 +81,11 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
     }
   };
 
-  // 🗑️ 3. DELETAR GASTO EXTRA DA PLANILHA
+  // 🗑️ Deletar via API do Google (DELETE)
   const handleDeleteExpense = (id: string) => {
-    fetch(`${URL_GASTOS_EXTRAS}/${id}`, {
-      method: "DELETE",
+    fetch(URL_NATIVA_GOOGLE, {
+      method: "POST",
+      body: JSON.stringify({ aba: "gastosExtras", action: "DELETE", id: id })
     })
       .then(() => {
         setExpenses((prev) => prev.filter((e) => e.id !== id));
@@ -106,7 +104,6 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
     return "";
   };
 
-  // 📍 FILTRO CRÍTICO: Exibe no card apenas os gastos cujo mês bate com o seletor do topo
   const expensesFiltradas = expenses.filter(
     (e) => e.month === filtroMesExtenso || e.month === selectedMonth
   );
@@ -115,6 +112,7 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
 
   return (
     <GlassCard className="p-5">
+      {/* 📍 A PARTIR DAQUI O VISUAL CONTINUA 100% IDÊNTICO */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <CalendarDays size={18} className="text-fuchsia-400" />
