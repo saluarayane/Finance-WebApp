@@ -19,13 +19,10 @@ export interface ExtraExpense {
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState("Mai");
-
-  const [totalExpenses, setTotalExpenses] = useState(0); // Apenas do card de Analysis
+  const [totalExpenses, setTotalExpenses] = useState(0);
   const [commissionsReceived, setCommissionsReceived] = useState(0);
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
   const [extraExpenses, setExtraExpenses] = useState<ExtraExpense[]>([]);
-  
-  // 📍 Novos Estados para alimentar a Visão Detalhada
   const [fixedExpensesData, setFixedExpensesData] = useState<any[]>([]);
   const [variableExpensesData, setVariableExpensesData] = useState<any[]>([]);
 
@@ -37,14 +34,10 @@ export default function Dashboard() {
       .then(data => {
         if (data.GANHOS_E_COMISSOES) {
           const apenasComissoes = data.GANHOS_E_COMISSOES.filter((item: any) => Number(item.VALOR_IMOVEL) > 0);
-          const formatado: ProjectedSale[] = apenasComissoes.map((item: any) => ({
-            id: String(item.ID_GANHO), 
-            propertyValue: Number(item.VALOR_IMOVEL), 
-            commission: Number(item.VALOR), 
-            month: item.MES_REFERENCIA,
-            received: item.RECEBIDO === "TRUE" || item.RECEBIDO === true || String(item.RECEBIDO).toLowerCase() === "true"
-          }));
-          setProjectedSales(formatado);
+          setProjectedSales(apenasComissoes.map((item: any) => ({
+            id: String(item.ID_GANHO), propertyValue: Number(item.VALOR_IMOVEL), commission: Number(item.VALOR), 
+            month: item.MES_REFERENCIA, received: String(item.RECEBIDO).toLowerCase() === "true"
+          })));
         }
       });
   };
@@ -54,8 +47,9 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => {
         if (data.GASTOS_EXTRAS) {
-          const formatado: ExtraExpense[] = data.GASTOS_EXTRAS.map((item: any) => ({
-            id: String(item.ID),
+          // 📍 CORREÇÃO: ID GARANTIDO AQUI
+          const formatado: ExtraExpense[] = data.GASTOS_EXTRAS.map((item: any, index: number) => ({
+            id: String(item.ID || `gen-${index}-${Date.now()}`),
             description: item.DESCRICAO,
             amount: Number(item.VALOR || 0),
             targetMonth: item.MES_ALVO,
@@ -71,24 +65,6 @@ export default function Dashboard() {
     carregarGastosExtrasDoBanco();
   }, [selectedMonth]); 
 
-  useEffect(() => {
-    const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
-    const comissoesDoMesComCheck = projectedSales
-      .filter(sale => (sale.month === filtroMesExtenso || sale.month === selectedMonth) && sale.received)
-      .reduce((sum, sale) => sum + sale.commission, 0);
-
-    setCommissionsReceived(comissoesDoMesComCheck);
-  }, [projectedSales, selectedMonth]);
-
-  const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
-    const payload = {
-      aba: "GANHOS_E_COMISSOES", action: "INSERT",
-      data: { ID_GANHO: `GN-${Date.now()}`, DESCRICAO: "Comissão de Venda Projetada", VALOR: sale.commission, MES_REFERENCIA: sale.month, RECEBIDO: false, VALOR_IMOVEL: sale.propertyValue }
-    };
-    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
-    .then(() => carregarVendasDoBanco());
-  };
-
   const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
     const payload = {
       aba: "GASTOS_EXTRAS", action: "INSERT",
@@ -102,21 +78,15 @@ export default function Dashboard() {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
     const novoStatus = !vendaAlvo.received;
-    const payload = { aba: "GANHOS_E_COMISSOES", action: "UPDATE", id: id, data: { RECEBIDO: novoStatus } };
-    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
-    .then(() => {
-      setProjectedSales(prev => prev.map(sale => sale.id === id ? { ...sale, received: novoStatus } : sale));
-    });
+    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ aba: "GANHOS_E_COMISSOES", action: "UPDATE", id: id, data: { RECEBIDO: novoStatus } }) })
+    .then(() => setProjectedSales(prev => prev.map(s => s.id === id ? { ...s, received: novoStatus } : s)));
   };
 
-  // 📍 PONTO 1: MATEMÁTICA DO SALDO TOTAL CORRETA (TUDO SUBTRAÍDO)
   const fixedIncome = 1300; 
   const totalIncome = fixedIncome + commissionsReceived;
   const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
   const extrasDoMes = extraExpenses.filter(e => e.targetMonth === selectedMonth || e.targetMonth === filtroMesExtenso).reduce((sum, e) => sum + e.amount, 0);
-  
-  const allExpenses = totalExpenses + extrasDoMes; 
-  const balance = totalIncome - allExpenses;
+  const balance = totalIncome - (totalExpenses + extrasDoMes);
 
   return (
     <div className="min-h-screen text-white font-sans relative pb-32 selection:bg-fuchsia-500/30">
@@ -124,34 +94,15 @@ export default function Dashboard() {
       <div className="max-w-md mx-auto w-full px-6 pt-10 flex flex-col items-center">
         <Header balance={balance} />
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-
         <div className="w-full space-y-6 mt-2">
-          <MonthDetailView 
-            month={selectedMonth} 
-            projectedSales={projectedSales} 
-            extraExpenses={extraExpenses} 
-            fixedExpensesData={fixedExpensesData}
-            variableExpensesData={variableExpensesData}
-          />
-          
-          <ExpenseAnalysis
-            onUpdateExpenses={(amount) => setTotalExpenses(amount)}
-            onExpensesDataLoad={(fixed, variable) => { setFixedExpensesData(fixed); setVariableExpensesData(variable); }}
-            totalIncome={totalIncome}
-            selectedMonth={selectedMonth}
-          />
-
-          <ExtraExpensesProjection 
-            selectedMonth={selectedMonth}
-            extraExpenses={extraExpenses}
-            onAddExtraExpense={handleAddExtraExpense}
-          />
-
+          <MonthDetailView month={selectedMonth} projectedSales={projectedSales} extraExpenses={extraExpenses} fixedExpensesData={fixedExpensesData} variableExpensesData={variableExpensesData} />
+          <ExpenseAnalysis onUpdateExpenses={(amount) => setTotalExpenses(amount)} onExpensesDataLoad={(fixed, variable) => { setFixedExpensesData(fixed); setVariableExpensesData(variable); }} totalIncome={totalIncome} selectedMonth={selectedMonth} />
+          <ExtraExpensesProjection selectedMonth={selectedMonth} extraExpenses={extraExpenses} onAddExtraExpense={handleAddExtraExpense} />
           <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
           <SavingsModule />
         </div>
       </div>
-      <CommissionCalculator onAddProjectedSale={handleAddProjectedSale} />
+      <CommissionCalculator onAddProjectedSale={(sale) => { fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ aba: "GANHOS_E_COMISSOES", action: "INSERT", data: { ID_GANHO: `GN-${Date.now()}`, DESCRICAO: "Comissão de Venda Projetada", VALOR: sale.commission, MES_REFERENCIA: sale.month, RECEBIDO: false, VALOR_IMOVEL: sale.propertyValue } }) }).then(() => carregarVendasDoBanco()); }} />
     </div>
   );
 }
