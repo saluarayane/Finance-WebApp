@@ -71,7 +71,6 @@ export function ExtraExpensesProjection({
   };
 
   // 📍 Lógica do Filtro: Mostra o gasto se ele for CRIADO neste mês OU se o ALVO for este mês.
-  // (E ignora os que acabaram de ser deletados)
   const expensesFiltradas = extraExpenses.filter(
     (e) => !deletedIds.includes(e.id) && (e.creationMonth === selectedMonth || e.targetMonth === selectedMonth)
   );
