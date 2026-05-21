@@ -47,9 +47,9 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => {
         if (data.GASTOS_EXTRAS) {
-          // 📍 CORREÇÃO: ID GARANTIDO AQUI
+          // 📍 CORREÇÃO CRUCIAL: Agora lê o ID_EXTRA real vindo da planilha
           const formatado: ExtraExpense[] = data.GASTOS_EXTRAS.map((item: any, index: number) => ({
-            id: String(item.ID || `gen-${index}-${Date.now()}`),
+            id: String(item.ID_EXTRA || item.id_extra || `gen-${index}-${Date.now()}`),
             description: item.DESCRICAO,
             amount: Number(item.VALOR || 0),
             targetMonth: item.MES_ALVO,
@@ -65,25 +65,13 @@ export default function Dashboard() {
     carregarGastosExtrasDoBanco();
   }, [selectedMonth]); 
 
-const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
-    const novoId = `GE-${Date.now()}`; // ID único gerado no padrão GE
+  const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
+    const novoId = `GE-${Date.now()}`;
     const payload = {
-      aba: "GASTOS_EXTRAS",
-      action: "INSERT",
-      data: {
-        ID_EXTRA: novoId, // Agora usando o nome exato da sua coluna
-        DESCRICAO: expenseData.description,
-        VALOR: expenseData.amount,
-        MES_ALVO: expenseData.targetMonth,
-        MES_CRIACAO: selectedMonth
-      }
+      aba: "GASTOS_EXTRAS", action: "INSERT",
+      data: { ID_EXTRA: novoId, DESCRICAO: expenseData.description, VALOR: expenseData.amount, MES_ALVO: expenseData.targetMonth, MES_CRIACAO: selectedMonth }
     };
-
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    })
+    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
     .then(() => carregarGastosExtrasDoBanco());
   };
 
@@ -110,7 +98,15 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
         <div className="w-full space-y-6 mt-2">
           <MonthDetailView month={selectedMonth} projectedSales={projectedSales} extraExpenses={extraExpenses} fixedExpensesData={fixedExpensesData} variableExpensesData={variableExpensesData} />
           <ExpenseAnalysis onUpdateExpenses={(amount) => setTotalExpenses(amount)} onExpensesDataLoad={(fixed, variable) => { setFixedExpensesData(fixed); setVariableExpensesData(variable); }} totalIncome={totalIncome} selectedMonth={selectedMonth} />
-          <ExtraExpensesProjection selectedMonth={selectedMonth} extraExpenses={extraExpenses} onAddExtraExpense={handleAddExtraExpense} onDeleteExtraExpense={(id) => setExtraExpenses(prev => prev.filter(e => e.id !== id))} />
+          
+          {/* 📍 PROPRIEDADE ONDELETE EXTRA EXPENSE CONECTADA COM SUCESSO AQUI EMBAIXO */}
+          <ExtraExpensesProjection 
+            selectedMonth={selectedMonth} 
+            extraExpenses={extraExpenses} 
+            onAddExtraExpense={handleAddExtraExpense}
+            onDeleteExtraExpense={(id) => setExtraExpenses(prev => prev.filter(e => e.id !== id))}
+          />
+          
           <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
           <SavingsModule />
         </div>
