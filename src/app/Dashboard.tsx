@@ -110,7 +110,7 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
         <div className="w-full space-y-6 mt-2">
           <MonthDetailView month={selectedMonth} projectedSales={projectedSales} extraExpenses={extraExpenses} fixedExpensesData={fixedExpensesData} variableExpensesData={variableExpensesData} />
           <ExpenseAnalysis onUpdateExpenses={(amount) => setTotalExpenses(amount)} onExpensesDataLoad={(fixed, variable) => { setFixedExpensesData(fixed); setVariableExpensesData(variable); }} totalIncome={totalIncome} selectedMonth={selectedMonth} />
-          <ExtraExpensesProjection selectedMonth={selectedMonth} extraExpenses={extraExpenses} onAddExtraExpense={handleAddExtraExpense} />
+          <ExtraExpensesProjection selectedMonth={selectedMonth} extraExpenses={extraExpenses} onAddExtraExpense={handleAddExtraExpense} onDeleteExtraExpense={(id) => setExtraExpenses(prev => prev.filter(e => e.id !== id))} />
           <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
           <SavingsModule />
         </div>
