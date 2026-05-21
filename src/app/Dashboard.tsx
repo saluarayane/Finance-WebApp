@@ -20,14 +20,14 @@ export interface ExtraExpense {
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState("Mai");
 
-  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0); // Apenas do card de Analysis
   const [commissionsReceived, setCommissionsReceived] = useState(0);
   const [projectedSales, setProjectedSales] = useState<ProjectedSale[]>([]);
   const [extraExpenses, setExtraExpenses] = useState<ExtraExpense[]>([]);
-
-  const fixedIncome = 1300; 
-  const totalIncome = fixedIncome + commissionsReceived;
-  const balance = totalIncome - totalExpenses;
+  
+  // 📍 Novos Estados para alimentar a Visão Detalhada
+  const [fixedExpensesData, setFixedExpensesData] = useState<any[]>([]);
+  const [variableExpensesData, setVariableExpensesData] = useState<any[]>([]);
 
   const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
@@ -37,7 +37,6 @@ export default function Dashboard() {
       .then(data => {
         if (data.GANHOS_E_COMISSOES) {
           const apenasComissoes = data.GANHOS_E_COMISSOES.filter((item: any) => Number(item.VALOR_IMOVEL) > 0);
-
           const formatado: ProjectedSale[] = apenasComissoes.map((item: any) => ({
             id: String(item.ID_GANHO), 
             propertyValue: Number(item.VALOR_IMOVEL), 
@@ -47,8 +46,7 @@ export default function Dashboard() {
           }));
           setProjectedSales(formatado);
         }
-      })
-      .catch(err => console.error("Erro ao buscar Ganhos no Google Script:", err));
+      });
   };
 
   const carregarGastosExtrasDoBanco = () => {
@@ -69,16 +67,6 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetch(`${URL_NATIVA_GOOGLE}?aba=DASHBOARD_MENSAL`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.DASHBOARD_MENSAL && data.DASHBOARD_MENSAL.length > 0) {
-          const dadosMes = data.DASHBOARD_MENSAL[0]; 
-          setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
-        }
-      })
-      .catch(err => console.error("Erro ao buscar Dashboard:", err));
-
     carregarVendasDoBanco();
     carregarGastosExtrasDoBanco();
   }, [selectedMonth]); 
@@ -92,103 +80,47 @@ export default function Dashboard() {
     setCommissionsReceived(comissoesDoMesComCheck);
   }, [projectedSales, selectedMonth]);
 
-  const handleUpdateBalance = (amount: number) => {
-    setCommissionsReceived(prev => prev + amount);
-  };
-
-  const handleUpdateExpenses = (amount: number) => {
-    setTotalExpenses(amount);
-  };
-
-  const handleAddCommission = (amount: number) => {
-    setCommissionsReceived(prev => prev + amount);
-  };
-
   const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
     const payload = {
-      aba: "GANHOS_E_COMISSOES", 
-      action: "INSERT",
-      data: {
-        ID_GANHO: `GN-${Date.now()}`,
-        DESCRICAO: "Comissão de Venda Projetada",
-        VALOR: sale.commission, 
-        MES_REFERENCIA: sale.month,
-        RECEBIDO: false,
-        VALOR_IMOVEL: sale.propertyValue
-      }
+      aba: "GANHOS_E_COMISSOES", action: "INSERT",
+      data: { ID_GANHO: `GN-${Date.now()}`, DESCRICAO: "Comissão de Venda Projetada", VALOR: sale.commission, MES_REFERENCIA: sale.month, RECEBIDO: false, VALOR_IMOVEL: sale.propertyValue }
     };
-
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, 
-      body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(() => {
-      carregarVendasDoBanco(); 
-    })
-    .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
+    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
+    .then(() => carregarVendasDoBanco());
   };
 
   const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
     const payload = {
-      aba: "GASTOS_EXTRAS",
-      action: "INSERT",
-      data: {
-        DESCRICAO: expenseData.description,
-        VALOR: expenseData.amount,
-        MES_ALVO: expenseData.targetMonth,
-        MES_CRIACAO: selectedMonth
-      }
+      aba: "GASTOS_EXTRAS", action: "INSERT",
+      data: { DESCRICAO: expenseData.description, VALOR: expenseData.amount, MES_ALVO: expenseData.targetMonth, MES_CRIACAO: selectedMonth }
     };
-
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(() => {
-      carregarGastosExtrasDoBanco(); 
-    })
-    .catch(err => console.error("Erro ao salvar Gasto Extra:", err));
+    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
+    .then(() => carregarGastosExtrasDoBanco());
   };
 
   const handleToggleReceived = (id: string) => {
     const vendaAlvo = projectedSales.find(s => s.id === id);
     if (!vendaAlvo) return;
-
     const novoStatus = !vendaAlvo.received;
-
-    const payload = {
-      aba: "GANHOS_E_COMISSOES",
-      action: "UPDATE",
-      id: id,
-      data: {
-        RECEBIDO: novoStatus
-      }
-    };
-
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    })
+    const payload = { aba: "GANHOS_E_COMISSOES", action: "UPDATE", id: id, data: { RECEBIDO: novoStatus } };
+    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
     .then(() => {
-      setProjectedSales(prev => prev.map(sale => {
-        if (sale.id === id) {
-          return { ...sale, received: novoStatus };
-        }
-        return sale;
-      }));
-    })
-    .catch(err => console.error("Erro ao atualizar status:", err));
+      setProjectedSales(prev => prev.map(sale => sale.id === id ? { ...sale, received: novoStatus } : sale));
+    });
   };
+
+  // 📍 PONTO 1: MATEMÁTICA DO SALDO TOTAL CORRETA (TUDO SUBTRAÍDO)
+  const fixedIncome = 1300; 
+  const totalIncome = fixedIncome + commissionsReceived;
+  const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
+  const extrasDoMes = extraExpenses.filter(e => e.targetMonth === selectedMonth || e.targetMonth === filtroMesExtenso).reduce((sum, e) => sum + e.amount, 0);
+  
+  const allExpenses = totalExpenses + extrasDoMes; 
+  const balance = totalIncome - allExpenses;
 
   return (
     <div className="min-h-screen text-white font-sans relative pb-32 selection:bg-fuchsia-500/30">
       <BackgroundOrbs />
-
       <div className="max-w-md mx-auto w-full px-6 pt-10 flex flex-col items-center">
         <Header balance={balance} />
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
@@ -196,14 +128,15 @@ export default function Dashboard() {
         <div className="w-full space-y-6 mt-2">
           <MonthDetailView 
             month={selectedMonth} 
-            onUpdateBalance={handleUpdateBalance} 
             projectedSales={projectedSales} 
             extraExpenses={extraExpenses} 
+            fixedExpensesData={fixedExpensesData}
+            variableExpensesData={variableExpensesData}
           />
           
           <ExpenseAnalysis
-            onUpdateBalance={handleUpdateBalance}
-            onUpdateExpenses={handleUpdateExpenses}
+            onUpdateExpenses={(amount) => setTotalExpenses(amount)}
+            onExpensesDataLoad={(fixed, variable) => { setFixedExpensesData(fixed); setVariableExpensesData(variable); }}
             totalIncome={totalIncome}
             selectedMonth={selectedMonth}
           />
@@ -215,15 +148,10 @@ export default function Dashboard() {
           />
 
           <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
-
           <SavingsModule />
         </div>
       </div>
-
-      <CommissionCalculator
-        onAddCommission={handleAddCommission}
-        onAddProjectedSale={handleAddProjectedSale}
-      />
+      <CommissionCalculator onAddProjectedSale={handleAddProjectedSale} />
     </div>
   );
 }
