@@ -13,8 +13,8 @@ export interface ExtraExpense {
   id: string;
   description: string;
   amount: number;
-  targetMonth: string; // O mês em que o gasto vai ocorrer
-  creationMonth: string; // O mês em que o usuário está visualizando/programando
+  targetMonth: string;
+  creationMonth: string;
 }
 
 export default function Dashboard() {
@@ -29,7 +29,6 @@ export default function Dashboard() {
   const totalIncome = fixedIncome + commissionsReceived;
   const balance = totalIncome - totalExpenses;
 
-  // 📍 COLE AQUI A SUA URL DO APPS SCRIPT
   const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
   const carregarVendasDoBanco = () => {
@@ -37,7 +36,6 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => {
         if (data.GANHOS_E_COMISSOES) {
-          // 📍 O SEGREDO 1: Lemos com os nomes EXATOS da planilha e filtramos as Quinzenas!
           const apenasComissoes = data.GANHOS_E_COMISSOES.filter((item: any) => Number(item.VALOR_IMOVEL) > 0);
 
           const formatado: ProjectedSale[] = apenasComissoes.map((item: any) => ({
@@ -54,35 +52,36 @@ export default function Dashboard() {
   };
 
   const carregarGastosExtrasDoBanco = () => {
-  fetch(`${URL_NATIVA_GOOGLE}?aba=GASTOS_EXTRAS`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.GASTOS_EXTRAS) {
-        const formatado: ExtraExpense[] = data.GASTOS_EXTRAS.map((item: any) => ({
-          id: String(item.ID),
-          description: item.DESCRICAO,
-          amount: Number(item.VALOR || 0),
-          targetMonth: item.MES_ALVO,      // Ex: "Jun"
-          creationMonth: item.MES_CRIACAO  // Ex: "Mai"
-        }));
-        setExtraExpenses(formatado);
-      }
-    });
-};
+    fetch(`${URL_NATIVA_GOOGLE}?aba=GASTOS_EXTRAS`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.GASTOS_EXTRAS) {
+          const formatado: ExtraExpense[] = data.GASTOS_EXTRAS.map((item: any) => ({
+            id: String(item.ID),
+            description: item.DESCRICAO,
+            amount: Number(item.VALOR || 0),
+            targetMonth: item.MES_ALVO,
+            creationMonth: item.MES_CRIACAO
+          }));
+          setExtraExpenses(formatado);
+        }
+      });
+  };
 
   useEffect(() => {
-  fetch(`${URL_NATIVA_GOOGLE}?aba=DASHBOARD_MENSAL`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.DASHBOARD_MENSAL && data.DASHBOARD_MENSAL.length > 0) {
-        const dadosMes = data.DASHBOARD_MENSAL[0]; 
-        setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
-      }
-    });
+    fetch(`${URL_NATIVA_GOOGLE}?aba=DASHBOARD_MENSAL`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.DASHBOARD_MENSAL && data.DASHBOARD_MENSAL.length > 0) {
+          const dadosMes = data.DASHBOARD_MENSAL[0]; 
+          setTotalExpenses(Number(dadosMes.gastosTotaisMensais || 0));
+        }
+      })
+      .catch(err => console.error("Erro ao buscar Dashboard:", err));
 
-  carregarVendasDoBanco();
-  carregarGastosExtrasDoBanco(); // 📍 Adicione esta chamada aqui!
-}, [selectedMonth]);
+    carregarVendasDoBanco();
+    carregarGastosExtrasDoBanco();
+  }, [selectedMonth]); 
 
   useEffect(() => {
     const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
@@ -106,7 +105,6 @@ export default function Dashboard() {
   };
 
   const handleAddProjectedSale = (sale: Omit<ProjectedSale, 'id'>) => {
-    // 📍 O SEGREDO 2: O payload de envio tem os nomes idênticos às colunas!
     const payload = {
       aba: "GANHOS_E_COMISSOES", 
       action: "INSERT",
@@ -120,7 +118,19 @@ export default function Dashboard() {
       }
     };
 
-const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
+    fetch(URL_NATIVA_GOOGLE, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, 
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(() => {
+      carregarVendasDoBanco(); 
+    })
+    .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
+  };
+
+  const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
     const payload = {
       aba: "GASTOS_EXTRAS",
       action: "INSERT",
@@ -128,7 +138,7 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
         DESCRICAO: expenseData.description,
         VALOR: expenseData.amount,
         MES_ALVO: expenseData.targetMonth,
-        MES_CRIACAO: selectedMonth // O mês que está selecionado no topo do App agora
+        MES_CRIACAO: selectedMonth
       }
     };
 
@@ -139,7 +149,6 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
     })
     .then(res => res.json())
     .then(() => {
-      // 📍 Força a atualização dos dados do banco
       carregarGastosExtrasDoBanco(); 
     })
     .catch(err => console.error("Erro ao salvar Gasto Extra:", err));
@@ -154,7 +163,7 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
     const payload = {
       aba: "GANHOS_E_COMISSOES",
       action: "UPDATE",
-      id: id, // O ID procurado será o nosso "GN-1234"
+      id: id,
       data: {
         RECEBIDO: novoStatus
       }
@@ -185,7 +194,12 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
 
         <div className="w-full space-y-6 mt-2">
-          <MonthDetailView month={selectedMonth} onUpdateBalance={handleUpdateBalance} projectedSales={projectedSales} extraExpenses={extraExpenses} />
+          <MonthDetailView 
+            month={selectedMonth} 
+            onUpdateBalance={handleUpdateBalance} 
+            projectedSales={projectedSales} 
+            extraExpenses={extraExpenses} 
+          />
           
           <ExpenseAnalysis
             onUpdateBalance={handleUpdateBalance}
@@ -194,7 +208,11 @@ const handleAddExtraExpense = (expenseData: { description: string, amount: numbe
             selectedMonth={selectedMonth}
           />
 
-          <ExtraExpensesProjection selectedMonth={selectedMonth} extraExpenses={extraExpenses} onAddExtraExpense={handleAddExtraExpense} />
+          <ExtraExpensesProjection 
+            selectedMonth={selectedMonth}
+            extraExpenses={extraExpenses}
+            onAddExtraExpense={handleAddExtraExpense}
+          />
 
           <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
 
