@@ -49,7 +49,7 @@ const monthNames: { [key: string]: string } = {
   "Set": "Setembro", "Out": "Outubro", "Nov": "Novembro", "Dez": "Dezembro"
 };
 
-export function MonthDetailView({ month, onUpdateBalance, projectedSales = [] }: MonthDetailViewProps) {
+export function MonthDetailView({ month, onUpdateBalance, projectedSales = [], extraExpenses = [] }: MonthDetailViewProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const fullMonthName = monthNames[month] || month;
 
@@ -223,7 +223,7 @@ export function MonthDetailView({ month, onUpdateBalance, projectedSales = [] }:
                     </div>
                   </div>
                 ))}
-                
+
 {gastosExtrasDoMes.map((extra) => (
 
   <div key={extra.id} className="p-3 rounded-xl border bg-purple-500/10 border-purple-500/30 flex items-center justify-between">

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { GlassCard } from "./GlassCard";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { clsx } from "clsx";
-import type { ExtraExpense } from "../pages/Dashboard"; // 📍 Importa a interface do Dashboard
+import type { ExtraExpense } from "../Dashboard"; // 📍 Importa a interface do Dashboard
 
 interface ExtraExpensesProjectionProps {
   selectedMonth?: string;
