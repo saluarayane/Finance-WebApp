@@ -59,7 +59,6 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
   const [newFixed, setNewFixed] = useState({ name: "", amount: "", iconIndex: 0 });
 
   useEffect(() => {
-    // 📍 PONTO 4: Nomes idênticos às abas da Planilha
     fetch(`${URL_NATIVA_GOOGLE}?aba=GASTOS_FIXOS`)
       .then(res => res.json())
       .then(data => {
@@ -67,7 +66,8 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
           const carregados = data.GASTOS_FIXOS.map((item: any) => {
             const iconObj = iconOptions.find(o => o.name.toLowerCase() === String(item.ICONE_REF || item.iconeRef || "").toLowerCase()) || iconOptions[0];
             return {
-              id: String(item.ID || item.id),
+              // 📍 Lemos o ID exato da planilha, ou geramos um seguro caso esteja em branco
+              id: String(item.ID_FIXO || item.idFixo || item.ID || item.id || `temp-${Math.random()}`),
               name: item.CATEGORIA || item.categoria,
               amount: Number(item.VALOR || item.valor || 0),
               icon: iconObj.icon,
@@ -90,7 +90,8 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
               const catId = variableCategories.find(c => c.name === catName)?.id || "outros";
               const dateStr = item.DATA || item.data;
               return {
-                id: String(item.ID || item.id),
+                // 📍 Garantia de RG único
+                id: String(item.ID_MOV || item.idMov || item.ID || item.id || `temp-${Math.random()}`),
                 amount: Number(item.VALOR || item.valor || 0),
                 category: catId,
                 timestamp: new Date(),
@@ -108,7 +109,7 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
 
   useEffect(() => {
     if (onUpdateExpenses) onUpdateExpenses(totalExpenses);
-    if (onExpensesDataLoad) onExpensesDataLoad(fixedExpenses, todayExpenses); // 📍 Envia dados para a Visão Detalhada
+    if (onExpensesDataLoad) onExpensesDataLoad(fixedExpenses, todayExpenses); 
   }, [totalExpenses, fixedExpenses, todayExpenses]);
 
   const categoryTotals = variableCategories.map(cat => ({
@@ -137,10 +138,14 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
     const nomeCategoriaExibicao = variableCategories.find(c => c.id === categoryId)?.name || "Outros";
 
     if (value > 0) {
+      // 📍 Forçamos a criação de um ID explícito para a planilha
+      const novoIdMov = `MV-${Date.now()}`;
+      
       const payload = {
         aba: "MOVIMENTACAO_VARIAVEL",
         action: "INSERT",
         data: {
+          ID_MOV: novoIdMov,
           DATA: new Date().toLocaleDateString('pt-BR'),
           CATEGORIA: nomeCategoriaExibicao,
           VALOR: value,
@@ -154,16 +159,15 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
         body: JSON.stringify(payload)
       })
       .then(res => res.json())
-      .then(data => {
+      .then(() => {
         const newExpense: VariableExpense = {
-          id: String(data.id),
+          id: novoIdMov,
           amount: value,
           category: categoryId,
           timestamp: new Date(),
           dateStr: new Date().toLocaleDateString('pt-BR')
         };
         setTodayExpenses(prev => [...prev, newExpense]);
-        if (onUpdateBalance) onUpdateBalance(-value);
         setQuickExpense("");
         setSelectedCategory(null);
         setShowCategorySelector(false);
@@ -179,7 +183,6 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
       body: JSON.stringify({ aba: "MOVIMENTACAO_VARIAVEL", action: "DELETE", id: id })
     })
     .then(() => {
-      if (onUpdateBalance) onUpdateBalance(expense.amount);
       setTodayExpenses(prev => prev.filter(exp => exp.id !== id));
     });
   };
@@ -196,9 +199,11 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
     const amount = parseFloat(newFixed.amount.replace(/\D/g, '')) / 100 || 0;
     if (newFixed.name && amount > 0) {
       const selectedIcon = iconOptions[newFixed.iconIndex];
+      const novoIdFixo = `FX-${Date.now()}`;
+
       const payload = {
         aba: "GASTOS_FIXOS", action: "INSERT",
-        data: { CATEGORIA: newFixed.name, VALOR: amount, ICONE_REF: selectedIcon.name.toLowerCase() }
+        data: { ID_FIXO: novoIdFixo, CATEGORIA: newFixed.name, VALOR: amount, ICONE_REF: selectedIcon.name.toLowerCase() }
       };
 
       fetch(URL_NATIVA_GOOGLE, {
@@ -206,9 +211,9 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
         body: JSON.stringify(payload)
       })
       .then(res => res.json())
-      .then(data => {
+      .then(() => {
         const newExpense: FixedExpense = {
-          id: String(data.id), name: newFixed.name, amount, icon: selectedIcon.icon, color: selectedIcon.color
+          id: novoIdFixo, name: newFixed.name, amount, icon: selectedIcon.icon, color: selectedIcon.color
         };
         setFixedExpenses(prev => [...prev, newExpense]);
         setNewFixed({ name: "", amount: "", iconIndex: 0 });
