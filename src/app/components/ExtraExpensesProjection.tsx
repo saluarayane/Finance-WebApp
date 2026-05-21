@@ -27,10 +27,18 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai", extraExpenses =
     }
   };
 
-  const handleDeleteExpense = (id: string) => {
+const handleDeleteExpense = (id: string) => {
     fetch(URL_NATIVA_GOOGLE, {
-      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ aba: "GASTOS_EXTRAS", action: "DELETE", id: id })
+      method: "POST", 
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ 
+        aba: "GASTOS_EXTRAS", 
+        action: "DELETE", 
+        id: id // O ID (GE-...) será enviado para o script
+      })
+    }).then(() => {
+        // Opcional: Adicione aqui uma chamada para recarregar se o seu projeto exigir
+        window.location.reload(); 
     });
   };
 

@@ -65,12 +65,25 @@ export default function Dashboard() {
     carregarGastosExtrasDoBanco();
   }, [selectedMonth]); 
 
-  const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
+const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
+    const novoId = `GE-${Date.now()}`; // ID único gerado no padrão GE
     const payload = {
-      aba: "GASTOS_EXTRAS", action: "INSERT",
-      data: { DESCRICAO: expenseData.description, VALOR: expenseData.amount, MES_ALVO: expenseData.targetMonth, MES_CRIACAO: selectedMonth }
+      aba: "GASTOS_EXTRAS",
+      action: "INSERT",
+      data: {
+        ID_EXTRA: novoId, // Agora usando o nome exato da sua coluna
+        DESCRICAO: expenseData.description,
+        VALOR: expenseData.amount,
+        MES_ALVO: expenseData.targetMonth,
+        MES_CRIACAO: selectedMonth
+      }
     };
-    fetch(URL_NATIVA_GOOGLE, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
+
+    fetch(URL_NATIVA_GOOGLE, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    })
     .then(() => carregarGastosExtrasDoBanco());
   };
 
