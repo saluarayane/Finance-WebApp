@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { GlassCard } from "./GlassCard";
 import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { clsx } from "clsx";
-// 📍 Lembrete: Mantenha o caminho de importação abaixo do jeito que funcionou para você no deploy!
 import type { ProjectedSale, ExtraExpense } from "../Dashboard";
 
 interface MonthDetailViewProps {
@@ -24,11 +23,9 @@ const categoryNames: Record<string, string> = {
   alimentacao: "Alimentação", lazer: "Lazer", transporte: "Transporte", outros: "Outros"
 };
 
-// 📍 FUNÇÃO NOVA: Limpa a data gigante do Google e transforma em "DD/MM"
 const formatShortDate = (dateString: string) => {
   if (!dateString) return "";
   
-  // Se for o formato ISO do Google (ex: 2026-05-21T03:00...)
   if (dateString.includes("T")) {
     const d = new Date(dateString);
     if (!isNaN(d.getTime())) {
@@ -36,7 +33,6 @@ const formatShortDate = (dateString: string) => {
     }
   }
   
-  // Se já for formato normal (DD/MM/YYYY), pega só os dois primeiros
   if (dateString.includes("/")) {
     const parts = dateString.split("/");
     if (parts.length >= 2) {
@@ -75,7 +71,6 @@ export function MonthDetailView({ month, projectedSales = [], extraExpenses = []
       id: `var-${catId}`, 
       description: categoryNames[catId] || catId, 
       amount: data.amount, 
-      // 📍 APLICANDO A LIMPEZA DA DATA AQUI
       date: `Atualizado em: ${formatShortDate(data.lastDate)}`, 
       type: 'variable' as const 
     }))
@@ -106,3 +101,70 @@ export function MonthDetailView({ month, projectedSales = [], extraExpenses = []
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-cyan-400/80 uppercase tracking-wide flex items-center gap-2"><ArrowUpRight size={14} /> Ganhos Recebidos</h4>
                 {incomes.length === 0 && <p className="text-xs text-white/30 italic px-2">Nenhuma comissão recebida.</p>}
+                {incomes.map((income) => (
+                  <div key={income.id} className="p-3 rounded-xl border bg-cyan-500/5 border-cyan-500/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400"><ArrowUpRight size={16} /></div>
+                        <div><p className="text-sm font-medium text-white">{income.description}</p><p className="text-xs text-white/40">{income.date}</p></div>
+                      </div>
+                      <span className="text-sm font-bold text-cyan-400">R$ {income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-cyan-400/80 uppercase tracking-wide flex items-center gap-2"><Calendar size={14} /> Ganhos Fixos</h4>
+                {fixedIncomes.map((income) => (
+                  <div key={income.id} className="p-3 rounded-xl border bg-cyan-500/5 border-cyan-500/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400"><Calendar size={16} /></div>
+                        <div><p className="text-sm font-medium text-white">{income.description}</p><p className="text-xs text-white/40">{income.date}</p></div>
+                      </div>
+                      <span className="text-sm font-bold text-cyan-400">R$ {income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-orange-400/80 uppercase tracking-wide flex items-center gap-2"><ArrowDownRight size={14} /> Gastos</h4>
+                
+                {expensesDisplay.map((expense) => (
+                  <div key={expense.id} className={clsx("p-3 rounded-xl border", expense.type === 'fixed' ? "bg-orange-500/10 border-orange-500/30" : "bg-orange-500/5 border-orange-500/15")}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center", expense.type === 'fixed' ? "bg-orange-500/30 text-orange-400" : "bg-orange-500/15 text-orange-300")}><ArrowDownRight size={16} /></div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{expense.description}<span className="ml-2 text-[10px] text-white/40 uppercase">{expense.type === 'fixed' ? 'Fixo' : 'Variável'}</span></p>
+                          <p className="text-xs text-white/40">{expense.date}</p>
+                        </div>
+                      </div>
+                      <span className={clsx("text-sm font-bold", expense.type === 'fixed' ? "text-orange-400" : "text-orange-300")}>R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {gastosExtrasDoMes.map((extra) => (
+                  <div key={extra.id} className="p-3 rounded-xl border bg-purple-500/10 border-purple-500/30 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400"><ArrowDownRight size={16} /></div>
+                      <div>
+                        <p className="text-sm font-medium text-white">{extra.description}</p>
+                        <p className="text-xs text-white/40">Gasto Extra (Prog. para {extra.targetMonth})</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-purple-400">R$ {extra.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlassCard>
+    </motion.div>
+  );
+}
