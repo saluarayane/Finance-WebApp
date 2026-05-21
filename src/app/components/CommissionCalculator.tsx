@@ -47,7 +47,6 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
     // 1. Coloca o botão no modo de carregamento animado ("Projetando...")
     setSyncState("syncing");
 
-    // 2. Dispara a gravação REAL na API do Sheety lá no Dashboard
     if (onAddProjectedSale) {
       onAddProjectedSale({
         propertyValue: numericValue,

@@ -28,18 +28,20 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai", extraExpenses =
   };
 
 const handleDeleteExpense = (id: string) => {
+    // Esconde visualmente na hora para o usuário não ficar esperando
+    const element = document.getElementById(`expense-${id}`);
+    if(element) element.style.display = 'none';
+
+    // Manda o Google apagar no banco de dados silenciosamente
     fetch(URL_NATIVA_GOOGLE, {
       method: "POST", 
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ 
         aba: "GASTOS_EXTRAS", 
         action: "DELETE", 
-        id: id // O ID (GE-...) será enviado para o script
+        id: id 
       })
-    }).then(() => {
-        // Opcional: Adicione aqui uma chamada para recarregar se o seu projeto exigir
-        window.location.reload(); 
-    });
+    }).catch(err => console.error("Erro ao deletar:", err));
   };
 
   // 📍 LÓGICA ATUALIZADA: Mês Atual (Mai = índice 4) ou meses futuros
@@ -55,7 +57,7 @@ const handleDeleteExpense = (id: string) => {
       </div>
       <div className="space-y-3">
         {expensesFiltradas.map((expense) => (
-          <div key={expense.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 group hover:border-white/20 transition-all backdrop-blur-sm">
+          <div id={`expense-${expense.id}`} key={expense.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 group hover:border-white/20 transition-all backdrop-blur-sm">
             <div className="flex-1"><p className="text-sm font-medium text-white">{expense.description}</p><p className="text-xs text-white/30">Programado para {expense.targetMonth}</p></div>
             <div className="flex items-center gap-3"><span className="text-sm font-bold text-orange-400">R$ {expense.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span><button onClick={() => handleDeleteExpense(expense.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/20 text-red-400"><Trash2 size={14} /></button></div>
           </div>

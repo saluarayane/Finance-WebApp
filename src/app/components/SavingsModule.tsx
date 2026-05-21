@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react"; // 📍 CORREÇÃO: Adicionado useEffect
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { PieChart, Pie, Cell } from "recharts";
 import { GlassCard } from "./GlassCard";
-import { Vault, Plus, TrendingUp, Calendar } from "lucide-react";
+import { Vault, Plus, TrendingUp } from "lucide-react";
 
-const URL_RESERVA = "https://api.sheety.co/b848ca0bc11ef70702138c361ae712a0/webAppPlanejamentoFinanceiro/reservaSemestral"; // 📍 CORREÇÃO: Link da Reserva Semestral
+const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
 export function SavingsModule() {
-  const [lockedAmount, setLockedAmount] = useState(0); // 📍 CORREÇÃO: Inicia em 0 até ler a planilha
+  const [lockedAmount, setLockedAmount] = useState(0);
+  const [dbRowId, setDbRowId] = useState<string>("RS-1"); 
   const [newAmount, setNewAmount] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
@@ -22,39 +23,47 @@ export function SavingsModule() {
     { name: "Incremento Projetado", value: monthlyIncrement, color: "#d946ef" } 
   ];
 
-  // 🔄 📍 CORREÇÃO: Puxar a reserva em tempo real do banco de dados Sheets
+  // 🔄 Busca o valor atual da aba RESERVA_SEMESTRAL
   useEffect(() => {
-    fetch(URL_RESERVA)
+    fetch(`${URL_NATIVA_GOOGLE}?aba=RESERVA_SEMESTRAL`)
       .then(res => res.json())
       .then(data => {
-        if (data.reservaSemestral && data.reservaSemestral.length > 0) {
-          setLockedAmount(Number(data.reservaSemestral[0].valorRetido || 0));
+        if (data.RESERVA_SEMESTRAL && data.RESERVA_SEMESTRAL.length > 0) {
+          const reserva = data.RESERVA_SEMESTRAL[0];
+          // Procura o valor considerando possíveis variações de maiúsculas/minúsculas do script
+          setLockedAmount(Number(reserva.VALOR_RETIDO || reserva.valor_retido || reserva.valorRetido || 0));
+          setDbRowId(String(reserva.ID_RESERVA || reserva.id_reserva || "RS-1")); 
         }
       })
-      .catch(err => console.error("Erro ao ler Reserva:", err));
+      .catch(err => console.error("Erro ao ler Reserva no Google:", err));
   }, []);
 
-  // 🚀 📍 CORREÇÃO: Salvando e atualizando a linha no Sheets via PUT
+  // 🚀 Atualiza a planilha (UPDATE) silenciosamente
   const handleAddAmount = () => {
     const value = parseFloat(newAmount.replace(/\D/g, '')) / 100 || 0;
     if (value > 0) {
       const novoTotalReserva = lockedAmount + value;
 
-      fetch(`${URL_RESERVA}/2`, { // Atualiza a linha 2 da aba
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reservaSemestral: {
-            valorRetido: novoTotalReserva
-          }
-        })
-      })
-      .then(() => {
-        setLockedAmount(novoTotalReserva);
-        setNewAmount("");
-        setIsAdding(false);
-      })
-      .catch(err => console.error("Erro ao atualizar poupança:", err));
+      // 1. Atualiza a tela instantaneamente (Otimismo)
+      setLockedAmount(novoTotalReserva);
+      setNewAmount("");
+      setIsAdding(false);
+
+      // 2. Envia o UPDATE silencioso para o Google Apps Script
+      const payload = {
+        aba: "RESERVA_SEMESTRAL",
+        action: "UPDATE",
+        id: dbRowId,
+        data: {
+          VALOR_RETIDO: novoTotalReserva
+        }
+      };
+
+      fetch(URL_NATIVA_GOOGLE, { 
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error("Erro ao atualizar poupança no Google:", err));
     }
   };
 
