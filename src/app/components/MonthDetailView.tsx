@@ -28,10 +28,19 @@ interface Expense {
   type: 'fixed' | 'variable';
 }
 
+interface ExtraExpense {
+  id: string;
+  description: string;
+  amount: number;
+  targetMonth: string;
+  creationMonth: string;
+}
+
 interface MonthDetailViewProps {
   month: string;
   onUpdateBalance?: (amount: number) => void;
-  projectedSales?: ProjectedSale[]; // 📍 2. Adicionamos a propriedade para receber do Dashboard
+  projectedSales?: ProjectedSale[];
+  extraExpenses?: ExtraExpense[]; // 📍
 }
 
 const monthNames: { [key: string]: string } = {
@@ -43,6 +52,10 @@ const monthNames: { [key: string]: string } = {
 export function MonthDetailView({ month, onUpdateBalance, projectedSales = [] }: MonthDetailViewProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const fullMonthName = monthNames[month] || month;
+
+  const gastosExtrasDoMes = extraExpenses.filter(e => 
+  e.targetMonth === month || e.creationMonth === month
+  );
 
   // 📍 3. O SEGREDO: Filtra dinamicamente as comissões daquele mês que estão com CHECK
   const incomes = projectedSales
@@ -210,6 +223,40 @@ export function MonthDetailView({ month, onUpdateBalance, projectedSales = [] }:
                     </div>
                   </div>
                 ))}
+                
+{gastosExtrasDoMes.map((extra) => (
+
+  <div key={extra.id} className="p-3 rounded-xl border bg-purple-500/10 border-purple-500/30 flex items-center justify-between">
+
+    <div className="flex items-center gap-3">
+
+      <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400">
+
+        <ArrowDownRight size={16} />
+
+      </div>
+
+      <div>
+
+        <p className="text-sm font-medium text-white">{extra.description}</p>
+
+        <p className="text-xs text-white/40">Gasto Extra (Prog. para {extra.targetMonth})</p>
+
+      </div>
+
+    </div>
+
+    <span className="text-sm font-bold text-purple-400">
+
+      R$ {extra.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+    </span>
+
+  </div>
+
+))} 
+
+
               </div>
             </motion.div>
           )}

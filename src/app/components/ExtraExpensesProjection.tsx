@@ -1,96 +1,62 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GlassCard } from "./GlassCard";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { clsx } from "clsx";
-
-interface ExtraExpense {
-  id: string;
-  name: string;
-  amount: number;
-  month: string;
-}
+import type { ExtraExpense } from "../pages/Dashboard"; // 📍 Importa a interface do Dashboard
 
 interface ExtraExpensesProjectionProps {
   selectedMonth?: string;
+  extraExpenses?: ExtraExpense[]; // 📍 Recebe os gastos do banco via Dashboard
+  onAddExtraExpense?: (data: { description: string, amount: number, targetMonth: string }) => void; // 📍 Recebe a função de salvar
 }
 
 const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
 
-export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpensesProjectionProps) {
-  const [expenses, setExpenses] = useState<ExtraExpense[]>([]);
+export function ExtraExpensesProjection({ 
+  selectedMonth = "Mai", 
+  extraExpenses = [], 
+  onAddExtraExpense 
+}: ExtraExpensesProjectionProps) {
+  
   const [isAdding, setIsAdding] = useState(false);
   const [newExpense, setNewExpense] = useState({ name: "", amount: "", month: "Mai" });
+  
+  // 📍 Truque para a UX: esconde o item na mesma hora ao deletar, antes mesmo do Google responder
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
 
-  const filtroMesExtenso = selectedMonth === "Mai" ? "Maio" : selectedMonth;
-
-  // 🔄 Buscar via API do Google
-  useEffect(() => {
-    fetch(`${URL_NATIVA_GOOGLE}?aba=gastosExtras`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.gastosExtras) {
-          const carregados = data.gastosExtras.map((item: any) => ({
-            id: String(item.id),
-            name: item.descricao,
-            amount: Number(item.valor || 0),
-            month: item.mesReferencia,
-          }));
-          setExpenses(carregados);
-        }
-      })
-      .catch((err) => console.error("Erro ao buscar Gastos Extras:", err));
-  }, [selectedMonth]); 
-
-  // 🚀 Salvar via API do Google (INSERT)
-  const handleAddExpense = () => {
+  // 🚀 Salvar via função do Dashboard
+  const handleAddClick = () => {
     const amount = parseFloat(newExpense.amount.replace(/\D/g, "")) / 100 || 0;
     const mesParaSalvar = newExpense.month === "Mai" ? "Maio" : newExpense.month;
 
-    if (newExpense.name && amount > 0) {
-      const payload = {
-        aba: "gastosExtras",
-        action: "INSERT",
-        data: {
-          descricao: newExpense.name,
-          valor: amount,
-          mesReferencia: mesParaSalvar,
-        },
-      };
+    if (newExpense.name && amount > 0 && onAddExtraExpense) {
+      // Manda os dados para o Dashboard salvar
+      onAddExtraExpense({
+        description: newExpense.name,
+        amount: amount,
+        targetMonth: mesParaSalvar
+      });
 
-      fetch(URL_NATIVA_GOOGLE, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          const novoGasto: ExtraExpense = {
-            id: String(data.id), // ID gerado nativamente pelo GAS
-            name: newExpense.name,
-            amount,
-            month: mesParaSalvar,
-          };
-
-          setExpenses((prev) => [...prev, novoGasto]);
-          setNewExpense({ name: "", amount: "", month: selectedMonth });
-          setIsAdding(false);
-        })
-        .catch((err) => console.error("Erro ao salvar gasto extra:", err));
+      // Limpa os campos e fecha o form
+      setNewExpense({ name: "", amount: "", month: selectedMonth });
+      setIsAdding(false);
     }
   };
 
   // 🗑️ Deletar via API do Google (DELETE)
   const handleDeleteExpense = (id: string) => {
+    // Esconde visualmente na hora
+    setDeletedIds(prev => [...prev, id]);
+
+    // Manda o Google apagar a linha na planilha
     fetch(URL_NATIVA_GOOGLE, {
       method: "POST",
-      body: JSON.stringify({ aba: "gastosExtras", action: "DELETE", id: id })
-    })
-      .then(() => {
-        setExpenses((prev) => prev.filter((e) => e.id !== id));
-      })
-      .catch((err) => console.error("Erro ao deletar gasto extra:", err));
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ aba: "GASTOS_EXTRAS", action: "DELETE", id: id })
+    }).catch((err) => console.error("Erro ao deletar gasto extra:", err));
   };
 
   const handleFormatCurrency = (value: string) => {
@@ -104,15 +70,16 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
     return "";
   };
 
-  const expensesFiltradas = expenses.filter(
-    (e) => e.month === filtroMesExtenso || e.month === selectedMonth
+  // 📍 Lógica do Filtro: Mostra o gasto se ele for CRIADO neste mês OU se o ALVO for este mês.
+  // (E ignora os que acabaram de ser deletados)
+  const expensesFiltradas = extraExpenses.filter(
+    (e) => !deletedIds.includes(e.id) && (e.creationMonth === selectedMonth || e.targetMonth === selectedMonth)
   );
 
   const totalProjected = expensesFiltradas.reduce((sum, exp) => sum + exp.amount, 0);
 
   return (
     <GlassCard className="p-5">
-      {/* 📍 A PARTIR DAQUI O VISUAL CONTINUA 100% IDÊNTICO */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <CalendarDays size={18} className="text-fuchsia-400" />
@@ -134,8 +101,8 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
               className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 group hover:border-white/20 transition-all backdrop-blur-sm"
             >
               <div className="flex-1">
-                <p className="text-sm font-medium text-white">{expense.name}</p>
-                <p className="text-xs text-white/30">Programado para {expense.month}</p>
+                <p className="text-sm font-medium text-white">{expense.description}</p>
+                <p className="text-xs text-white/30">Programado para {expense.targetMonth}</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.4)]">
@@ -196,7 +163,7 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai" }: ExtraExpenses
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={handleAddExpense}
+                    onClick={handleAddClick}
                     className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-orange-500 to-fuchsia-600 text-white text-sm font-medium transition-all active:scale-95"
                   >
                     Adicionar

@@ -120,16 +120,29 @@ export default function Dashboard() {
       }
     };
 
+const handleAddExtraExpense = (expenseData: { description: string, amount: number, targetMonth: string }) => {
+    const payload = {
+      aba: "GASTOS_EXTRAS",
+      action: "INSERT",
+      data: {
+        DESCRICAO: expenseData.description,
+        VALOR: expenseData.amount,
+        MES_ALVO: expenseData.targetMonth,
+        MES_CRIACAO: selectedMonth // O mês que está selecionado no topo do App agora
+      }
+    };
+
     fetch(URL_NATIVA_GOOGLE, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, 
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     })
     .then(res => res.json())
     .then(() => {
-      carregarVendasDoBanco(); 
+      // 📍 Força a atualização dos dados do banco
+      carregarGastosExtrasDoBanco(); 
     })
-    .catch(err => console.error("Erro crítico ao salvar no Google Sheets:", err));
+    .catch(err => console.error("Erro ao salvar Gasto Extra:", err));
   };
 
   const handleToggleReceived = (id: string) => {
@@ -181,7 +194,7 @@ export default function Dashboard() {
             selectedMonth={selectedMonth}
           />
 
-          <ExtraExpensesProjection selectedMonth={selectedMonth} />
+          <ExtraExpensesProjection selectedMonth={selectedMonth} extraExpenses={extraExpenses} onAddExtraExpense={handleAddExtraExpense} />
 
           <AnnualGoals projectedSales={projectedSales} onToggleReceived={handleToggleReceived} />
 
