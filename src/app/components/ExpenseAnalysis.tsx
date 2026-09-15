@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Cigarette, Leaf, Dumbbell, Coffee, ShoppingBag, Zap, Plus, Edit3, X, Trash2, Check, MoreHorizontal } from "lucide-react";
+import { Cigarette, Leaf, Dumbbell, Coffee, ShoppingBag, Zap, Plus, Edit3, X, Trash2, MoreHorizontal } from "lucide-react";
 import { GlassCard } from "./GlassCard";
 import { clsx } from "clsx";
+import { fetchSheet, writeSheet } from "../../config/api";
+import { toFullMonthName } from "../utils/months";
 
 interface VariableExpense {
   id: string;
@@ -10,6 +12,7 @@ interface VariableExpense {
   category: string;
   timestamp: Date;
   dateStr?: string;
+  monthReference: string; // MES_REFERENCIA como salvo na planilha (ex: "Maio")
 }
 
 interface FixedExpense {
@@ -44,29 +47,30 @@ interface ExpenseAnalysisProps {
   selectedMonth?: string;
 }
 
-const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
-
 export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesDataLoad, totalIncome = 23270.50, selectedMonth = "Mai" }: ExpenseAnalysisProps) {
   const [quickExpense, setQuickExpense] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showCategorySelector, setShowCategorySelector] = useState(false);
-  const [todayExpenses, setTodayExpenses] = useState<VariableExpense[]>([]);
   const [showTodayExpenses, setShowTodayExpenses] = useState(false);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+
+  // 📍 CORREÇÃO: guardamos TODAS as movimentações variáveis (de todos os meses) aqui,
+  // e derivamos "todayExpenses" (as do mês selecionado) com useMemo logo abaixo.
+  // Antes, cada troca de mês refazia a chamada de rede inteira para os dois endpoints,
+  // mesmo os dados de GASTOS_FIXOS não dependendo do mês nenhum.
+  const [allVariableExpenses, setAllVariableExpenses] = useState<VariableExpense[]>([]);
 
   const [editingFixed, setEditingFixed] = useState(false);
   const [addingFixed, setAddingFixed] = useState(false);
   const [newFixed, setNewFixed] = useState({ name: "", amount: "", iconIndex: 0 });
 
-  useEffect(() => {
-    fetch(`${URL_NATIVA_GOOGLE}?aba=GASTOS_FIXOS`)
-      .then(res => res.json())
-      .then(data => {
+  const carregarGastosFixos = () => {
+    fetchSheet<{ GASTOS_FIXOS?: any[] }>("GASTOS_FIXOS")
+      .then((data) => {
         if (data.GASTOS_FIXOS) {
           const carregados = data.GASTOS_FIXOS.map((item: any) => {
             const iconObj = iconOptions.find(o => o.name.toLowerCase() === String(item.ICONE_REF || item.iconeRef || "").toLowerCase()) || iconOptions[0];
             return {
-              // 📍 Lemos o ID exato da planilha, ou geramos um seguro caso esteja em branco
               id: String(item.ID_FIXO || item.idFixo || item.ID || item.id || `temp-${Math.random()}`),
               name: item.CATEGORIA || item.categoria,
               amount: Number(item.VALOR || item.valor || 0),
@@ -76,32 +80,44 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
           });
           setFixedExpenses(carregados);
         }
-      });
+      })
+      .catch((err) => console.error("Erro ao carregar gastos fixos:", err));
+  };
 
-    fetch(`${URL_NATIVA_GOOGLE}?aba=MOVIMENTACAO_VARIAVEL`)
-      .then(res => res.json())
-      .then(data => {
+  const carregarMovimentacaoVariavel = () => {
+    fetchSheet<{ MOVIMENTACAO_VARIAVEL?: any[] }>("MOVIMENTACAO_VARIAVEL")
+      .then((data) => {
         if (data.MOVIMENTACAO_VARIAVEL) {
-          const filtroMes = selectedMonth === "Mai" ? "Maio" : selectedMonth;
-          const filtrados = data.MOVIMENTACAO_VARIAVEL
-            .filter((item: any) => (item.MES_REFERENCIA || item.mesReferencia) === filtroMes)
-            .map((item: any) => {
-              const catName = item.CATEGORIA || item.categoria;
-              const catId = variableCategories.find(c => c.name === catName)?.id || "outros";
-              const dateStr = item.DATA || item.data;
-              return {
-                // 📍 Garantia de RG único
-                id: String(item.ID_MOV || item.idMov || item.ID || item.id || `temp-${Math.random()}`),
-                amount: Number(item.VALOR || item.valor || 0),
-                category: catId,
-                timestamp: new Date(),
-                dateStr: dateStr || new Date().toLocaleDateString('pt-BR')
-              };
-            });
-          setTodayExpenses(filtrados);
+          const carregados = data.MOVIMENTACAO_VARIAVEL.map((item: any) => {
+            const catName = item.CATEGORIA || item.categoria;
+            const catId = variableCategories.find(c => c.name === catName)?.id || "outros";
+            const dateStr = item.DATA || item.data;
+            return {
+              id: String(item.ID_MOV || item.idMov || item.ID || item.id || `temp-${Math.random()}`),
+              amount: Number(item.VALOR || item.valor || 0),
+              category: catId,
+              timestamp: new Date(),
+              dateStr: dateStr || new Date().toLocaleDateString('pt-BR'),
+              monthReference: item.MES_REFERENCIA || item.mesReferencia || "",
+            };
+          });
+          setAllVariableExpenses(carregados);
         }
-      });
-  }, [selectedMonth]);
+      })
+      .catch((err) => console.error("Erro ao carregar movimentação variável:", err));
+  };
+
+  // Busca tudo uma única vez, ao montar o componente.
+  useEffect(() => {
+    carregarGastosFixos();
+    carregarMovimentacaoVariavel();
+  }, []);
+
+  // Filtra localmente, sem nova chamada de rede, sempre que o mês selecionado muda.
+  const todayExpenses = useMemo(() => {
+    const filtroMes = toFullMonthName(selectedMonth);
+    return allVariableExpenses.filter((item) => item.monthReference === filtroMes || item.monthReference === selectedMonth);
+  }, [allVariableExpenses, selectedMonth]);
 
   const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount, 0);
   const totalVariable = todayExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -109,7 +125,7 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
 
   useEffect(() => {
     if (onUpdateExpenses) onUpdateExpenses(totalExpenses);
-    if (onExpensesDataLoad) onExpensesDataLoad(fixedExpenses, todayExpenses); 
+    if (onExpensesDataLoad) onExpensesDataLoad(fixedExpenses, todayExpenses);
   }, [totalExpenses, fixedExpenses, todayExpenses]);
 
   const categoryTotals = variableCategories.map(cat => ({
@@ -138,10 +154,10 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
     const nomeCategoriaExibicao = variableCategories.find(c => c.id === categoryId)?.name || "Outros";
 
     if (value > 0) {
-      // 📍 Forçamos a criação de um ID explícito para a planilha
       const novoIdMov = `MV-${Date.now()}`;
-      
-      const payload = {
+      const mesReferencia = toFullMonthName(selectedMonth);
+
+      writeSheet({
         aba: "MOVIMENTACAO_VARIAVEL",
         action: "INSERT",
         data: {
@@ -149,50 +165,41 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
           DATA: new Date().toLocaleDateString('pt-BR'),
           CATEGORIA: nomeCategoriaExibicao,
           VALOR: value,
-          MES_REFERENCIA: selectedMonth === "Mai" ? "Maio" : selectedMonth
-        }
-      };
-
-      fetch(URL_NATIVA_GOOGLE, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
+          MES_REFERENCIA: mesReferencia,
+        },
       })
-      .then(res => res.json())
-      .then(() => {
-        const newExpense: VariableExpense = {
-          id: novoIdMov,
-          amount: value,
-          category: categoryId,
-          timestamp: new Date(),
-          dateStr: new Date().toLocaleDateString('pt-BR')
-        };
-        setTodayExpenses(prev => [...prev, newExpense]);
-        setQuickExpense("");
-        setSelectedCategory(null);
-        setShowCategorySelector(false);
-      });
+        .then(() => {
+          const newExpense: VariableExpense = {
+            id: novoIdMov,
+            amount: value,
+            category: categoryId,
+            timestamp: new Date(),
+            dateStr: new Date().toLocaleDateString('pt-BR'),
+            monthReference: mesReferencia,
+          };
+          setAllVariableExpenses(prev => [...prev, newExpense]);
+          setQuickExpense("");
+          setSelectedCategory(null);
+          setShowCategorySelector(false);
+        })
+        .catch((err) => console.error("Erro ao adicionar gasto variável:", err));
     }
   };
 
   const handleRemoveTodayExpense = (id: string) => {
-    const expense = todayExpenses.find(exp => exp.id === id);
+    const expense = allVariableExpenses.find(exp => exp.id === id);
     if (!expense) return;
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ aba: "MOVIMENTACAO_VARIAVEL", action: "DELETE", id: id })
-    })
-    .then(() => {
-      setTodayExpenses(prev => prev.filter(exp => exp.id !== id));
-    });
+    writeSheet({ aba: "MOVIMENTACAO_VARIAVEL", action: "DELETE", id })
+      .then(() => {
+        setAllVariableExpenses(prev => prev.filter(exp => exp.id !== id));
+      })
+      .catch((err) => console.error("Erro ao remover gasto variável:", err));
   };
 
   const handleDeleteFixed = (id: number | string) => {
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ aba: "GASTOS_FIXOS", action: "DELETE", id: String(id) })
-    })
-    .then(() => { setFixedExpenses(prev => prev.filter(exp => exp.id !== id)); });
+    writeSheet({ aba: "GASTOS_FIXOS", action: "DELETE", id: String(id) })
+      .then(() => { setFixedExpenses(prev => prev.filter(exp => exp.id !== id)); })
+      .catch((err) => console.error("Erro ao remover gasto fixo:", err));
   };
 
   const handleAddFixed = () => {
@@ -201,24 +208,20 @@ export function ExpenseAnalysis({ onUpdateBalance, onUpdateExpenses, onExpensesD
       const selectedIcon = iconOptions[newFixed.iconIndex];
       const novoIdFixo = `FX-${Date.now()}`;
 
-      const payload = {
-        aba: "GASTOS_FIXOS", action: "INSERT",
-        data: { ID_FIXO: novoIdFixo, CATEGORIA: newFixed.name, VALOR: amount, ICONE_REF: selectedIcon.name.toLowerCase() }
-      };
-
-      fetch(URL_NATIVA_GOOGLE, {
-        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
+      writeSheet({
+        aba: "GASTOS_FIXOS",
+        action: "INSERT",
+        data: { ID_FIXO: novoIdFixo, CATEGORIA: newFixed.name, VALOR: amount, ICONE_REF: selectedIcon.name.toLowerCase() },
       })
-      .then(res => res.json())
-      .then(() => {
-        const newExpense: FixedExpense = {
-          id: novoIdFixo, name: newFixed.name, amount, icon: selectedIcon.icon, color: selectedIcon.color
-        };
-        setFixedExpenses(prev => [...prev, newExpense]);
-        setNewFixed({ name: "", amount: "", iconIndex: 0 });
-        setAddingFixed(false);
-      });
+        .then(() => {
+          const newExpense: FixedExpense = {
+            id: novoIdFixo, name: newFixed.name, amount, icon: selectedIcon.icon, color: selectedIcon.color
+          };
+          setFixedExpenses(prev => [...prev, newExpense]);
+          setNewFixed({ name: "", amount: "", iconIndex: 0 });
+          setAddingFixed(false);
+        })
+        .catch((err) => console.error("Erro ao adicionar gasto fixo:", err));
     }
   };
 

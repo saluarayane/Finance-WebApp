@@ -2,24 +2,25 @@ import { motion } from "motion/react";
 import { clsx } from "clsx";
 import { useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { MONTHS_SHORT, getCurrentShortMonth } from "../utils/months";
 
 interface MonthSelectorProps {
   selectedMonth: string;
   onSelect: (month: string) => void;
 }
 
-const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const currentMonthIndex = 4; // Maio (índice 4)
+const months = MONTHS_SHORT;
+const currentMonth = getCurrentShortMonth();
+const currentMonthIndex = months.indexOf(currentMonth);
 
 export function MonthSelector({ selectedMonth, onSelect }: MonthSelectorProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Auto-scroll para o mês atual (Maio) ao carregar pela primeira vez
-    // Usar setTimeout para garantir que o DOM está completamente renderizado
+    // Auto-scroll para o mês atual ao carregar pela primeira vez
     const timer = setTimeout(() => {
       if (scrollRef.current) {
-        const currentButton = scrollRef.current.querySelector(`[data-month="Mai"]`);
+        const currentButton = scrollRef.current.querySelector(`[data-month="${currentMonth}"]`);
         if (currentButton) {
           currentButton.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
         }
@@ -81,7 +82,6 @@ export function MonthSelector({ selectedMonth, onSelect }: MonthSelectorProps) {
                   {month}
                 </span>
 
-                {/* Pílula neon para o mês atual selecionado */}
                 {isSelected && isCurrent && (
                   <motion.div
                     layoutId="activeMonth"
@@ -95,7 +95,6 @@ export function MonthSelector({ selectedMonth, onSelect }: MonthSelectorProps) {
                   />
                 )}
 
-                {/* Pílula translúcida para outros meses selecionados */}
                 {isSelected && !isCurrent && (
                   <motion.div
                     layoutId="activeMonth"
@@ -107,7 +106,6 @@ export function MonthSelector({ selectedMonth, onSelect }: MonthSelectorProps) {
                   />
                 )}
 
-                {/* Indicador de mês atual (ponto neon) */}
                 {isCurrent && (
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-fuchsia-400 shadow-[0_0_8px_rgba(217,70,239,0.8)]" />
                 )}

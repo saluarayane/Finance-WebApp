@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { GlassCard } from "./GlassCard";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
-import type { ExtraExpense } from "../app/Dashboard"; 
+import type { ExtraExpense } from "../Dashboard";
+import { writeSheet } from "../../config/api";
+import { MONTHS_SHORT } from "../utils/months";
 
 interface ExtraExpensesProjectionProps {
   selectedMonth?: string;
@@ -10,12 +12,11 @@ interface ExtraExpensesProjectionProps {
   onDeleteExtraExpense?: (id: string) => void;
 }
 
-const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
+const months = MONTHS_SHORT;
 
 export function ExtraExpensesProjection({ selectedMonth = "Mai", extraExpenses = [], onAddExtraExpense, onDeleteExtraExpense }: ExtraExpensesProjectionProps) {
   const [isAdding, setIsAdding] = useState(false);
-  const [newExpense, setNewExpense] = useState({ name: "", amount: "", month: "Mai" });
+  const [newExpense, setNewExpense] = useState({ name: "", amount: "", month: selectedMonth });
 
   const handleAddClick = () => {
     const amount = parseFloat(newExpense.amount.replace(/\D/g, "")) / 100 || 0;
@@ -32,11 +33,10 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai", extraExpenses =
       onDeleteExtraExpense(id);
     }
 
-    // 2. Manda a ordem de exclusão silenciosa para o Google Sheets
-    fetch(URL_NATIVA_GOOGLE, {
-      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ aba: "GASTOS_EXTRAS", action: "DELETE", id: id })
-    }).catch(err => console.error("Erro ao deletar no Google:", err));
+    // 2. Manda a ordem de exclusão para o Google Sheets
+    writeSheet({ aba: "GASTOS_EXTRAS", action: "DELETE", id }).catch((err) =>
+      console.error("Erro ao deletar no Google:", err)
+    );
   };
 
   const currentMonthIndex = months.indexOf(selectedMonth);
@@ -47,7 +47,7 @@ export function ExtraExpensesProjection({ selectedMonth = "Mai", extraExpenses =
     <GlassCard className="p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <CalendarDays size={18} className="text-fuchsia-400" /> 
+          <CalendarDays size={18} className="text-fuchsia-400" />
           <h2 className="text-lg font-bold text-white">Projeção de Gastos Extras</h2>
         </div>
         <span className="text-xs font-normal text-white/50 bg-white/10 px-2 py-1 rounded-full">

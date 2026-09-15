@@ -3,39 +3,36 @@ import { motion, AnimatePresence } from "motion/react";
 import { PieChart, Pie, Cell } from "recharts";
 import { GlassCard } from "./GlassCard";
 import { Vault, Plus, TrendingUp } from "lucide-react";
-
-const URL_NATIVA_GOOGLE = "https://script.google.com/macros/s/AKfycbxpk3OuNbMN-e_apaCakfHBtY_gnXWK5Yl_V-C0sGeSft1WRtHwaEmzZVXRC0jpYS9L/exec";
+import { fetchSheet, writeSheet } from "../../config/api";
 
 export function SavingsModule() {
   const [lockedAmount, setLockedAmount] = useState(0);
-  const [dbRowId, setDbRowId] = useState<string>("RS-1"); 
+  const [dbRowId, setDbRowId] = useState<string>("RS-1");
   const [newAmount, setNewAmount] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  const currentFixedIncome = 1300; 
-  const monthlyIncrement = lockedAmount / 6; 
+  const currentFixedIncome = 1300;
+  const monthlyIncrement = lockedAmount / 6;
 
   const total = currentFixedIncome + monthlyIncrement;
   const incrementPercentage = total > 0 ? (monthlyIncrement / total) * 100 : 0;
 
   const data = [
-    { name: "Ganho Fixo Atual", value: currentFixedIncome, color: "#22d3ee" }, 
-    { name: "Incremento Projetado", value: monthlyIncrement, color: "#d946ef" } 
+    { name: "Ganho Fixo Atual", value: currentFixedIncome, color: "#22d3ee" },
+    { name: "Incremento Projetado", value: monthlyIncrement, color: "#d946ef" }
   ];
 
   // 🔄 Busca o valor atual da aba RESERVA_SEMESTRAL
   useEffect(() => {
-    fetch(`${URL_NATIVA_GOOGLE}?aba=RESERVA_SEMESTRAL`)
-      .then(res => res.json())
-      .then(data => {
+    fetchSheet<{ RESERVA_SEMESTRAL?: any[] }>("RESERVA_SEMESTRAL")
+      .then((data) => {
         if (data.RESERVA_SEMESTRAL && data.RESERVA_SEMESTRAL.length > 0) {
           const reserva = data.RESERVA_SEMESTRAL[0];
-          // Procura o valor considerando possíveis variações de maiúsculas/minúsculas do script
           setLockedAmount(Number(reserva.VALOR_RETIDO || reserva.valor_retido || reserva.valorRetido || 0));
-          setDbRowId(String(reserva.ID_RESERVA || reserva.id_reserva || "RS-1")); 
+          setDbRowId(String(reserva.ID_RESERVA || reserva.id_reserva || "RS-1"));
         }
       })
-      .catch(err => console.error("Erro ao ler Reserva no Google:", err));
+      .catch((err) => console.error("Erro ao ler Reserva no Google:", err));
   }, []);
 
   // 🚀 Atualiza a planilha (UPDATE) silenciosamente
@@ -49,21 +46,17 @@ export function SavingsModule() {
       setNewAmount("");
       setIsAdding(false);
 
-      // 2. Envia o UPDATE silencioso para o Google Apps Script
-      const payload = {
+      // 2. Envia o UPDATE para o Google Apps Script
+      writeSheet({
         aba: "RESERVA_SEMESTRAL",
         action: "UPDATE",
         id: dbRowId,
-        data: {
-          VALOR_RETIDO: novoTotalReserva
-        }
-      };
-
-      fetch(URL_NATIVA_GOOGLE, { 
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      }).catch(err => console.error("Erro ao atualizar poupança no Google:", err));
+        data: { VALOR_RETIDO: novoTotalReserva },
+      }).catch((err) => {
+        console.error("Erro ao atualizar poupança no Google:", err);
+        // Reverte visualmente já que a escrita falhou
+        setLockedAmount(lockedAmount);
+      });
     }
   };
 

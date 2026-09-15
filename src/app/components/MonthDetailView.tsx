@@ -4,6 +4,7 @@ import { GlassCard } from "./GlassCard";
 import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { clsx } from "clsx";
 import type { ProjectedSale, ExtraExpense } from "../Dashboard";
+import { toFullMonthName, MONTHS_SHORT } from "../utils/months";
 
 interface MonthDetailViewProps {
   month: string;
@@ -13,39 +14,33 @@ interface MonthDetailViewProps {
   variableExpensesData?: any[];
 }
 
-const monthNames: { [key: string]: string } = {
-  "Jan": "Janeiro", "Fev": "Fevereiro", "Mar": "Março", "Abr": "Abril",
-  "Mai": "Maio", "Jun": "Junho", "Jul": "Julho", "Ago": "Agosto",
-  "Set": "Setembro", "Out": "Outubro", "Nov": "Novembro", "Dez": "Dezembro"
-};
-
 const categoryNames: Record<string, string> = {
   alimentacao: "Alimentação", lazer: "Lazer", transporte: "Transporte", outros: "Outros"
 };
 
 const formatShortDate = (dateString: string) => {
   if (!dateString) return "";
-  
+
   if (dateString.includes("T")) {
     const d = new Date(dateString);
     if (!isNaN(d.getTime())) {
       return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
     }
   }
-  
+
   if (dateString.includes("/")) {
     const parts = dateString.split("/");
     if (parts.length >= 2) {
       return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
     }
   }
-  
-  return dateString; 
+
+  return dateString;
 };
 
 export function MonthDetailView({ month, projectedSales = [], extraExpenses = [], fixedExpensesData = [], variableExpensesData = [] }: MonthDetailViewProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const fullMonthName = monthNames[month] || month;
+  const fullMonthName = toFullMonthName(month);
 
   const gastosExtrasDoMes = extraExpenses.filter(e => e.targetMonth === month || e.targetMonth === fullMonthName);
 
@@ -53,9 +48,13 @@ export function MonthDetailView({ month, projectedSales = [], extraExpenses = []
     .filter(sale => (sale.month === month || sale.month === fullMonthName) && sale.received)
     .map(sale => ({ id: sale.id, description: "Comissão de Venda", amount: sale.commission, date: "Meta Concluída" }));
 
+  // 📍 CORREÇÃO: as datas das quinzenas agora acompanham o mês selecionado
+  // (antes estavam fixas em "01/05" e "15/05", ou seja, sempre Maio).
+  const monthNumber = MONTHS_SHORT.indexOf(month) + 1;
+  const monthNumberStr = String(monthNumber || new Date().getMonth() + 1).padStart(2, "0");
   const fixedIncomes = [
-    { id: "f1", description: "Quinzena 1", amount: 650.00, date: "01/05" },
-    { id: "f2", description: "Quinzena 2", amount: 650.00, date: "15/05" },
+    { id: "f1", description: "Quinzena 1", amount: 650.00, date: `01/${monthNumberStr}` },
+    { id: "f2", description: "Quinzena 2", amount: 650.00, date: `15/${monthNumberStr}` },
   ];
 
   const aggregatedVariables = variableExpensesData.reduce((acc, curr) => {
@@ -67,12 +66,12 @@ export function MonthDetailView({ month, projectedSales = [], extraExpenses = []
 
   const expensesDisplay = [
     ...fixedExpensesData.map(f => ({ id: f.id, description: f.name, amount: f.amount, date: "Fixo Mensal", type: 'fixed' as const })),
-    ...Object.entries(aggregatedVariables).map(([catId, data]: [string, any]) => ({ 
-      id: `var-${catId}`, 
-      description: categoryNames[catId] || catId, 
-      amount: data.amount, 
-      date: `Atualizado em: ${formatShortDate(data.lastDate)}`, 
-      type: 'variable' as const 
+    ...Object.entries(aggregatedVariables).map(([catId, data]: [string, any]) => ({
+      id: `var-${catId}`,
+      description: categoryNames[catId] || catId,
+      amount: data.amount,
+      date: `Atualizado em: ${formatShortDate(data.lastDate)}`,
+      type: 'variable' as const
     }))
   ];
 
@@ -97,7 +96,7 @@ export function MonthDetailView({ month, projectedSales = [], extraExpenses = []
         <AnimatePresence>
           {isExpanded && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-5 overflow-hidden mt-5 pt-5 border-t border-white/10">
-              
+
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-cyan-400/80 uppercase tracking-wide flex items-center gap-2"><ArrowUpRight size={14} /> Ganhos Recebidos</h4>
                 {incomes.length === 0 && <p className="text-xs text-white/30 italic px-2">Nenhuma comissão recebida.</p>}
@@ -131,7 +130,7 @@ export function MonthDetailView({ month, projectedSales = [], extraExpenses = []
 
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-orange-400/80 uppercase tracking-wide flex items-center gap-2"><ArrowDownRight size={14} /> Gastos</h4>
-                
+
                 {expensesDisplay.map((expense) => (
                   <div key={expense.id} className={clsx("p-3 rounded-xl border", expense.type === 'fixed' ? "bg-orange-500/10 border-orange-500/30" : "bg-orange-500/5 border-orange-500/15")}>
                     <div className="flex items-center justify-between">

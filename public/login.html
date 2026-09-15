@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acesso — WebApp Financeiro</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(ellipse at top, #1a0b2e, #080b14 60%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      form {
+        width: 100%;
+        max-width: 320px;
+        padding: 32px 28px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(25px);
+        border: 0.5px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        color: #fff;
+        font-size: 18px;
+        margin: 0 0 20px;
+        text-align: center;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font-size: 16px;
+        outline: none;
+        margin-bottom: 12px;
+      }
+      button {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(90deg, #f97316, #d946ef);
+        color: #fff;
+        font-weight: 600;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      p.error {
+        color: #fca5a5;
+        font-size: 13px;
+        text-align: center;
+        margin: 12px 0 0;
+        min-height: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="login-form">
+      <h1>Digite a senha de acesso</h1>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        placeholder="Senha"
+        autocomplete="current-password"
+        autofocus
+        required
+      />
+      <button type="submit" id="submit-btn">Entrar</button>
+      <p class="error" id="error-message"></p>
+    </form>
+
+    <script>
+      const form = document.getElementById("login-form");
+      const button = document.getElementById("submit-btn");
+      const errorMessage = document.getElementById("error-message");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        errorMessage.textContent = "";
+
+        const password = document.getElementById("password").value;
+
+        try {
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+          });
+
+          if (res.ok) {
+            // Redireciona pra raiz do app, já autenticado neste aparelho.
+            window.location.href = "/";
+          } else {
+            const data = await res.json().catch(() => ({}));
+            errorMessage.textContent = data.error || "Senha incorreta.";
+          }
+        } catch (err) {
+          errorMessage.textContent = "Erro de conexão. Tente novamente.";
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

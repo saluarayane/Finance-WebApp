@@ -1,29 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Drawer } from "vaul";
 import { motion, AnimatePresence } from "motion/react";
 import { Calculator, TrendingUp, CheckCircle2, ChevronUp } from "lucide-react";
 import { GlassCard } from "./GlassCard";
 import { clsx } from "clsx";
 import type { ProjectedSale } from "./AnnualGoals";
+import { MONTHS_SHORT, getCurrentShortMonth } from "../utils/months";
 
 interface CommissionCalculatorProps {
-  onAddCommission: (amount: number) => void;
   onAddProjectedSale: (sale: Omit<ProjectedSale, 'id'>) => void;
 }
 
-const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const months = MONTHS_SHORT;
 
-export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: CommissionCalculatorProps) {
+export function CommissionCalculator({ onAddProjectedSale }: CommissionCalculatorProps) {
   const [open, setOpen] = useState(false);
   const [propertyValue, setPropertyValue] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("Mai");
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentShortMonth());
   const [syncState, setSyncState] = useState<"idle" | "syncing" | "success">("idle");
 
   const numericValue = parseFloat(propertyValue.replace(/\D/g, '')) / 100 || 0;
-  
+
   const commissionPercentage = 0.05; // 5% total commission
   const agentCut = 0.35; // 35% for the agent
-  
+
   const totalCommission = numericValue * commissionPercentage;
   const agentCommission = totalCommission * agentCut;
 
@@ -44,26 +44,22 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
   const handleSave = () => {
     if (agentCommission <= 0) return;
 
-    // 1. Coloca o botão no modo de carregamento animado ("Projetando...")
     setSyncState("syncing");
 
-    if (onAddProjectedSale) {
-      onAddProjectedSale({
-        propertyValue: numericValue,
-        commission: agentCommission,
-        month: selectedMonth,
-        received: false
-      });
-    }
+    onAddProjectedSale({
+      propertyValue: numericValue,
+      commission: agentCommission,
+      month: selectedMonth,
+      received: false
+    });
 
-    // 3. Ativa o aviso de sucesso e agenda o fechamento suave do painel
     setSyncState("success");
-    
+
     setTimeout(() => {
       setSyncState("idle");
       setOpen(false);
       setPropertyValue("");
-    }, 1200); 
+    }, 1200);
   };
 
   return (
@@ -89,12 +85,12 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
           <Drawer.Content className="bg-transparent flex flex-col rounded-t-[32px] mt-24 fixed bottom-0 left-0 right-0 z-50 h-[85vh] outline-none">
             <GlassCard intensity="high" className="flex-1 rounded-t-[32px] rounded-b-none border-b-0 p-6 flex flex-col pb-10">
               <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 mb-8" />
-              
+
               <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
                 <Drawer.Title className="text-2xl font-bold text-white mb-6">
                   Calcular Comissão
                 </Drawer.Title>
-                
+
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-white/60">
@@ -177,7 +173,7 @@ export function CommissionCalculator({ onAddCommission, onAddProjectedSale }: Co
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-fuchsia-600 opacity-90 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
-                  
+
                   <div className="relative h-full flex items-center justify-center gap-2 z-10">
                     {syncState === "idle" ? (
                       <>
